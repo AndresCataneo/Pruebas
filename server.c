@@ -139,48 +139,133 @@ bool isOnFile(const char *bufferOriginal)
 #include <stdio.h>
 #include <stdlib.h>
 
-void saveSystemInfo(const char *filename) {
-    FILE *fp = fopen(filename, "w");
+#include <stdio.h>
+#include <stdlib.h>
+
+void saveSystemInfo(const char *outputFile)
+{
+    FILE *fp = fopen(outputFile, "w");
     if (!fp) {
-        perror("[-] Error al crear archivo");
+        perror("[-] Error opening file");
         return;
     }
 
+    char buffer[512];
+    FILE *fpCommand;
+
+    // Sistema y Kernel
     fprintf(fp, "=== Sistema y Kernel ===\n");
-    system("uname -a >> sysinfo.txt"); // OS y Kernel
+    fpCommand = popen("uname -s -r", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Distribución ===\n");
-    system("lsb_release -a >> sysinfo.txt 2>/dev/null");
+    // Distribución
+    fprintf(fp, "=== Distribución ===\n");
+    fpCommand = popen("cat /etc/os-release | grep PRETTY_NAME", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Direcciones IP ===\n");
-    system("ip addr show >> sysinfo.txt");
+    // Direcciones IP
+    fprintf(fp, "=== Direcciones IP ===\n");
+    fpCommand = popen("hostname -I", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== CPU y Núcleos ===\n");
-    system("lscpu >> sysinfo.txt");
+    // CPU y Núcleos
+    fprintf(fp, "=== CPU y Núcleos ===\n");
+    fpCommand = popen("lscpu", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Memoria ===\n");
-    system("free -h >> sysinfo.txt");
+    // Memoria
+    fprintf(fp, "=== Memoria ===\n");
+    fpCommand = popen("free -h", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Disco ===\n");
-    system("df -h >> sysinfo.txt");
+    // Disco
+    fprintf(fp, "=== Disco ===\n");
+    fpCommand = popen("df -h", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Usuarios conectados ===\n");
-    system("who >> sysinfo.txt");
+    // Usuarios conectados
+    fprintf(fp, "=== Usuarios conectados ===\n");
+    fpCommand = popen("who", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Todos los usuarios del sistema ===\n");
-    system("cut -d: -f1 /etc/passwd >> sysinfo.txt");
+    // Todos los usuarios del sistema
+    fprintf(fp, "=== Todos los usuarios del sistema ===\n");
+    fpCommand = popen("cut -d: -f1 /etc/passwd", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Uptime ===\n");
-    system("uptime >> sysinfo.txt");
+    // Uptime
+    fprintf(fp, "=== Uptime ===\n");
+    fpCommand = popen("uptime -p", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Procesos activos ===\n");
-    system("ps -e >> sysinfo.txt");
+    // Procesos activos
+    fprintf(fp, "=== Procesos activos ===\n");
+    fpCommand = popen("ps -e", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
-    fprintf(fp, "\n=== Directorios montados ===\n");
-    system("mount >> sysinfo.txt");
+    // Directorios montados
+    fprintf(fp, "=== Directorios montados ===\n");
+    fpCommand = popen("mount | column -t", "r");
+    if (fpCommand) {
+        while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
+            fputs(buffer, fp);
+        pclose(fpCommand);
+    }
+    fprintf(fp, "\n");
 
     fclose(fp);
 }
+
 
 int main()
 {
