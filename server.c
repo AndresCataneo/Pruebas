@@ -69,11 +69,9 @@ void saveNetworkInfo(const char *outputFile){
 /*
     Función para enviar un archivo a través del socket
 */
-void sendFile(const char *filename, int sockfd)
-{
+void sendFile(const char *filename, int sockfd){
     FILE *fp = fopen(filename, "r");
-    if (fp == NULL)
-    {
+    if (fp == NULL){
         perror("[-] Cannot open the file");
         return;
     }
@@ -81,10 +79,8 @@ void sendFile(const char *filename, int sockfd)
     size_t bytes;
 
     // Leemos el archivo y enviamos su contenido a través del socket
-    while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
-    {
-        if (send(sockfd, buffer, bytes, 0) == -1)
-        {
+    while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0){
+        if (send(sockfd, buffer, bytes, 0) == -1){
             perror("[-] Error to send the file");
             break;
         }
@@ -95,8 +91,7 @@ void sendFile(const char *filename, int sockfd)
 /*
     Función para convertir a minúsculas
 */
-void toLowerCase(char *str)
-{
+void toLowerCase(char *str){
     for (int i = 0; str[i]; i++)
         str[i] = tolower((unsigned char)str[i]);
 }
@@ -104,8 +99,7 @@ void toLowerCase(char *str)
 /*
     Función para eliminar espacios al inicio y final
 */
-void trim(char *str)
-{
+void trim(char *str){
     char *end;
     while (isspace((unsigned char)*str))
         str++; // inicio
@@ -119,8 +113,7 @@ void trim(char *str)
 /*
     Función para verificar si una palabra está en el archivo cipherworlds.txt
 */
-bool isOnFile(const char *bufferOriginal)
-{
+bool isOnFile(const char *bufferOriginal){
     FILE *fp;
     char line[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
@@ -131,13 +124,11 @@ bool isOnFile(const char *bufferOriginal)
     trim(buffer);
     toLowerCase(buffer);
     fp = fopen("cipherworlds.txt", "r");
-    if (fp == NULL)
-    {
+    if (fp == NULL){
         printf("[-]Error opening file!\n");
         return false;
     }
-    while (fgets(line, sizeof(line), fp) != NULL)
-    {
+    while (fgets(line, sizeof(line), fp) != NULL){
         line[strcspn(line, "\n")] = '\0';
         trim(line);
         toLowerCase(line);
@@ -154,8 +145,7 @@ bool isOnFile(const char *bufferOriginal)
 /*
     Función para guardar la información del sistema en el archivo sysinfo.txt
 */
-void saveSystemInfo(const char *outputFile)
-{
+void saveSystemInfo(const char *outputFile){
     FILE *fp = fopen(outputFile, "w");
     if (!fp) {
         perror("[-] Error opening file");
@@ -293,8 +283,7 @@ int main()
 
     // Creamos el socket del servidor para la comunicación
     server_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_sock == -1)
-    {
+    if (server_sock == -1){
         perror("[-] Error to create the socket");
         return 1;
     }
@@ -305,16 +294,14 @@ int main()
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     //Asignamos el socket a la dirección y puerto especificados
-    if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
-    {
+    if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
         perror("[-] Error binding");
         close(server_sock);
         return 1;
     }
 
     // Escuchamos conexiones entrantes
-    if (listen(server_sock, 1) < 0)
-    {
+    if (listen(server_sock, 1) < 0){
         perror("[-] Error on listen");
         close(server_sock);
         return 1;
@@ -324,8 +311,7 @@ int main()
     //Esperamos y aceptamos una conexión entrante
     addr_size = sizeof(client_addr);
     client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &addr_size);
-    if (client_sock < 0)
-    {
+    if (client_sock < 0){
         perror("[-] Error on accept");
         close(server_sock);
         return 1;
@@ -334,8 +320,7 @@ int main()
 
     //Recibimos la clave encriptada + desplazamiento
     int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
-    if (bytes <= 0)
-    {
+    if (bytes <= 0){
         printf("[-] Missed key\n");
         close(client_sock);
         close(server_sock);
@@ -349,8 +334,7 @@ int main()
 
 
     //Verificamos si la clave está en el archivo
-    if (isOnFile(clave))
-    {
+    if (isOnFile(clave)){
         decryptCaesar(clave, shift);
         printf("[+][Server] Key decrypted: %s\n", clave);
         send(client_sock, "ACCESS GRANTED", strlen("ACCESS GRANTED"), 0);
@@ -365,8 +349,7 @@ int main()
         sendFile("sysinfo.txt", client_sock);
         printf("[+] Sent file sysinfo.txt\n");
     }
-    else
-    {
+    else{
         send(client_sock, "ACCESS DENIED", strlen("ACCESS DENIED"), 0);
         printf("[-][Server] Wrong Key\n");
     }
