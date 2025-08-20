@@ -91,7 +91,7 @@ void toLowerCase(char *str)
     for (int i = 0; str[i]; i++)
         str[i] = tolower((unsigned char)str[i]);
 }
-// Funci ́on para eliminar espacios al inicio y final
+// Función para eliminar espacios al inicio y final
 void trim(char *str)
 {
     char *end;
@@ -136,11 +136,6 @@ bool isOnFile(const char *bufferOriginal)
     return foundWorld;
 }
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <stdio.h>
-#include <stdlib.h>
 
 void saveSystemInfo(const char *outputFile)
 {
@@ -324,11 +319,16 @@ int main()
         decryptCaesar(clave, shift);
         printf("[+][Server] Key decrypted: %s\n", clave);
         send(client_sock, "ACCESS GRANTED", strlen("ACCESS GRANTED"), 0);
-        sleep(1); // Peque~na pausa para evitar colisión de datos
+        
+        sleep(1); // Pequeña pausa para evitar colisión de datos
         saveNetworkInfo("network_info.txt");
-        saveSystemInfo("sysinfo.txt");
         sendFile("network_info.txt", client_sock);
-        printf("[+] Sent file\n");
+        printf("[+] Sent file network_info.txt\n");
+        
+        sleep(1); // Pequeña pausa para evitar colisión de datos con network_info
+        saveSystemInfo("sysinfo.txt");
+        sendFile("sysinfo.txt", client_sock);
+        printf("[+] Sent file sysinfo.txt\n");
     }
     else
     {
