@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     char buffer[BUFFER_SIZE] = {0};
     char mensaje[BUFFER_SIZE];
-    char *server_ip = "XXX.XXX.XXX.XXX";
+    char *server_ip = "192.168.1.70";
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (client_sock == -1)
     {
