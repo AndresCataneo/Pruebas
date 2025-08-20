@@ -11,32 +11,34 @@
 #define PORT 7006        // Puerto en el que el servidor escucha
 #define BUFFER_SIZE 1024 // Tamaño del buffer para recibir datos
 
-void decryptCaesar(char *text, int shift)
-{
+/*
+    Función para desencriptar texto usando el cifrado César
+*/
+void decryptCaesar(char *text, int shift){
+    // Ajustamos el desplazamiento y verificamos si las letras son mayúsculas o minúsculas
     shift = shift % 26;
-    for (int i = 0; text[i] != '\0'; i++)
-    {
+    for (int i = 0; text[i] != '\0'; i++){
         char c = text[i];
-        if (isupper(c))
-        {
+        if (isupper(c)){
             text[i] = ((c - 'A' - shift + 26) % 26) + 'A';
         }
-        else if (islower(c))
-        {
+        else if (islower(c)){
             text[i] = ((c - 'a' - shift + 26) % 26) + 'a';
         }
-        else
-        {
+        else{
             text[i] = c;
         }
     }
 }
 
-void saveNetworkInfo(const char *outputFile)
-{
+/*
+    Función para guardar la información de red del equipo en un archivo
+*/
+void saveNetworkInfo(const char *outputFile){
     FILE *fpCommand;
     FILE *fpOutput;
     char buffer[512];
+
     // Ejecutar comando para obtener información de red
     fpCommand = popen("ip addr show", "r");
     if (fpCommand == NULL)
@@ -64,6 +66,9 @@ void saveNetworkInfo(const char *outputFile)
     pclose(fpCommand);
 }
 
+/*
+    Función para enviar un archivo a través del socket
+*/
 void sendFile(const char *filename, int sockfd)
 {
     FILE *fp = fopen(filename, "r");
@@ -74,6 +79,8 @@ void sendFile(const char *filename, int sockfd)
     }
     char buffer[BUFFER_SIZE];
     size_t bytes;
+
+    // Leemos el archivo y enviamos su contenido a través del socket
     while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
     {
         if (send(sockfd, buffer, bytes, 0) == -1)
@@ -85,13 +92,18 @@ void sendFile(const char *filename, int sockfd)
     fclose(fp);
 }
 
-// Función para convertir a minúsculas
+/*
+    Función para convertir a minúsculas
+*/
 void toLowerCase(char *str)
 {
     for (int i = 0; str[i]; i++)
         str[i] = tolower((unsigned char)str[i]);
 }
-// Función para eliminar espacios al inicio y final
+
+/*
+    Función para eliminar espacios al inicio y final
+*/
 void trim(char *str)
 {
     char *end;
@@ -104,6 +116,9 @@ void trim(char *str)
     *(end + 1) = '\0';
 }
 
+/*
+    Función para verificar si una palabra está en el archivo cipherworlds.txt
+*/
 bool isOnFile(const char *bufferOriginal)
 {
     FILE *fp;
@@ -136,7 +151,9 @@ bool isOnFile(const char *bufferOriginal)
     return foundWorld;
 }
 
-
+/*
+    Función para guardar la información del sistema en el archivo sysinfo.txt
+*/
 void saveSystemInfo(const char *outputFile)
 {
     FILE *fp = fopen(outputFile, "w");
@@ -149,7 +166,7 @@ void saveSystemInfo(const char *outputFile)
     FILE *fpCommand;
 
     // Sistema y Kernel
-    fprintf(fp, "=== Sistema y Kernel ===\n");
+    fprintf(fp, "\n*** Sistema y Kernel ***\n");
     fpCommand = popen("uname -s -r", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -159,7 +176,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Distribución
-    fprintf(fp, "=== Distribución ===\n");
+    fprintf(fp, "*** Distribución ***\n");
     fpCommand = popen("cat /etc/os-release | grep PRETTY_NAME", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -169,8 +186,8 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Direcciones IP
-    fprintf(fp, "=== Direcciones IP ===\n");
-    fpCommand = popen("hostname -I", "r");
+    fprintf(fp, "*** Direcciones IP ***\n");
+    fpCommand = popen("ip -o addr show | awk '{print $2, $3, $4}'", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
             fputs(buffer, fp);
@@ -179,7 +196,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // CPU y Núcleos
-    fprintf(fp, "=== CPU y Núcleos ===\n");
+    fprintf(fp, "*** CPU y Núcleos ***\n");
     fpCommand = popen("lscpu", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -189,7 +206,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Memoria
-    fprintf(fp, "=== Memoria ===\n");
+    fprintf(fp, "*** Memoria ***\n");
     fpCommand = popen("free -h", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -199,7 +216,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Disco
-    fprintf(fp, "=== Disco ===\n");
+    fprintf(fp, "*** Disco ***\n");
     fpCommand = popen("df -h", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -209,7 +226,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Usuarios conectados
-    fprintf(fp, "=== Usuarios conectados ===\n");
+    fprintf(fp, "*** Usuarios conectados ***\n");
     fpCommand = popen("who", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -219,7 +236,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Todos los usuarios del sistema
-    fprintf(fp, "=== Todos los usuarios del sistema ===\n");
+    fprintf(fp, "*** Todos los usuarios del sistema ***\n");
     fpCommand = popen("cut -d: -f1 /etc/passwd", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -229,7 +246,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Uptime
-    fprintf(fp, "=== Uptime ===\n");
+    fprintf(fp, "*** Uptime ***\n");
     fpCommand = popen("uptime -p", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -239,7 +256,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Procesos activos
-    fprintf(fp, "=== Procesos activos ===\n");
+    fprintf(fp, "*** Procesos activos ***\n");
     fpCommand = popen("ps -e", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -249,7 +266,7 @@ void saveSystemInfo(const char *outputFile)
     fprintf(fp, "\n");
 
     // Directorios montados
-    fprintf(fp, "=== Directorios montados ===\n");
+    fprintf(fp, "*** Directorios montados ***\n");
     fpCommand = popen("mount | column -t", "r");
     if (fpCommand) {
         while (fgets(buffer, sizeof(buffer), fpCommand) != NULL)
@@ -262,6 +279,9 @@ void saveSystemInfo(const char *outputFile)
 }
 
 
+/*
+    Función principal con la configuración del socket
+*/
 int main()
 {
     int server_sock, client_sock;
@@ -270,22 +290,29 @@ int main()
     char buffer[BUFFER_SIZE] = {0};
     char clave[BUFFER_SIZE];
     int shift;
+
+    // Creamos el socket del servidor para la comunicación
     server_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (server_sock == -1)
     {
         perror("[-] Error to create the socket");
         return 1;
     }
+
+    //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
+    //Asignamos el socket a la dirección y puerto especificados
     if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("[-] Error binding");
         close(server_sock);
         return 1;
     }
+
+    // Escuchamos conexiones entrantes
     if (listen(server_sock, 1) < 0)
     {
         perror("[-] Error on listen");
@@ -293,6 +320,8 @@ int main()
         return 1;
     }
     printf("[+] Server listening port %d...\n", PORT);
+
+    //Esperamos y aceptamos una conexión entrante
     addr_size = sizeof(client_addr);
     client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &addr_size);
     if (client_sock < 0)
@@ -302,6 +331,8 @@ int main()
         return 1;
     }
     printf("[+] Client conneted\n");
+
+    //Recibimos la clave encriptada + desplazamiento
     int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
     if (bytes <= 0)
     {
@@ -311,9 +342,13 @@ int main()
         return 1;
     }
     buffer[bytes] = '\0';
-    sscanf(buffer, "%s %d", clave, &shift); // extrae clave y desplazamiento
+
+    // Extraemos la clave y desplazamiento del mensaje recibido
+    sscanf(buffer, "%s %d", clave, &shift); 
     printf("[+][Server] Encrypted key obtained: %s\n", clave);
 
+
+    //Verificamos si la clave está en el archivo
     if (isOnFile(clave))
     {
         decryptCaesar(clave, shift);
