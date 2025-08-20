@@ -1,25 +1,34 @@
 #include <stdio.h>
 #include <ctype.h>
 
+/*
+    Función para encriptar texto usando el cifrado César
+*/
 void encryptCaesar(char *text, int shift) {
-    shift = shift % 26;  // Aseguramos que el desplazamiento esté entre 0 y 25
+    // Ajustamos el desplazamiento y verificamos si las letras son mayúsculas o minúsculas
+    shift = shift % 26; 
     for (int i = 0; text[i] != '\0'; i++) {
         char c = text[i];
-        if (isupper(c)) { // Si es letra mayúscula
+        if (isupper(c)) { 
             text[i] = ((c - 'A' + shift) % 26) + 'A';
-        } else if (islower(c)) { // Si es letra minúscula
+        } else if (islower(c)) {
             text[i] = ((c - 'a' + shift) % 26) + 'a';
         }
     }
 }
 
+/* 
+    Función principal para encriptar un mensaje
+*/
 int main() {
-    char mensaje[100];
+    char mensaje[150];
     int desplazamiento;
 
     printf("Introduce un mensaje: ");
-    fgets(mensaje, sizeof(mensaje), stdin); // Leemos el mensaje desde stdin
+    // Leemos el mensaje desde stdin
+    fgets(mensaje, sizeof(mensaje), stdin); 
     printf("Introduce el desplazamiento: ");
+    // Leemos el desplazamiento desde stdin
     scanf("%d", &desplazamiento);
 
     encryptCaesar(mensaje, desplazamiento);
