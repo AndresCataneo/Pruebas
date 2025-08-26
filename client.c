@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
     }
 
         // Enviar datos
+        char buffer[BUFFER_SIZE];
         snprintf(buffer, sizeof(buffer), "%s|%s|%s", target_port, shift, file_content);
         send(sock, buffer, strlen(buffer), 0);
     
