@@ -301,8 +301,9 @@ int main(int argc, char *argv[]){
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_size;
     char buffer[BUFFER_SIZE] = {0};
-    char file[BUFFER_SIZE] = {0};
+    char file_content[BUFFER_SIZE] = {0};
     int shift;
+    int requested_port;
 
     // Creamos el socket del servidor para la comunicación
     server_sock = socket(AF_INET, SOCK_STREAM, 0);
