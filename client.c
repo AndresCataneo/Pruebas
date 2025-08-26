@@ -6,14 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORT 7006
+//#define PORT 7006
 #define BUFFER_SIZE 1024
-
+int PORTS[] = {49200, 49201, 49202};
 
 int main(int argc, char *argv[]){
-    if (argc != 3){
-        printf("Type: %s <key> <shift>\n", argv[0]);
-        return 1;
+    if (argc != 5) {
+        printf("USE: %s <SERVER_IP> <PORT> <SHIFT> <FILENAME>\n", argv[0]);
+        exit(1);
     }
     char *clave = argv[1];
     char *shift = argv[2];
