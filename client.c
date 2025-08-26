@@ -1,75 +1,68 @@
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
-//#define PORT 7006
-#define BUFFER_SIZE 1024
-int PORTS[] = {49200, 49201, 49202};
+#define BUFFER_SIZE 4096
+int servers[] = {49200, 49201, 49202};
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
     if (argc != 5) {
         printf("USE: %s <SERVER_IP> <PORT> <SHIFT> <FILENAME>\n", argv[0]);
         exit(1);
     }
-    char *clave = argv[1];
-    char *shift = argv[2];
-    int client_sock;
-    struct sockaddr_in serv_addr;
-    char buffer[BUFFER_SIZE] = {0};
-    char mensaje[BUFFER_SIZE];
-    // Dirección IP del servidor
-    char *server_ip = "192.168.1.70";
 
-    // Creamos el socket del servidor para la comunicación
-    client_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (client_sock == -1){
-        perror("[-] Error to create the socket");
-        return 1;
+    char *server_ip = argv[1];
+    char *target_port = argv[2]; 
+    char *shift = argv[3];       
+    char *filename = argv[4];
+
+    // Leer archivo
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        perror("Error opening file");
+        exit(1);
     }
+    char file_content[BUFFER_SIZE] = {0};
+    fread(file_content, 1, sizeof(file_content) - 1, fp);
+    fclose(fp);
 
-    //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-    serv_addr.sin_addr.s_addr = inet_addr(server_ip);
-
-    // Conectamos al servidor
-    if (connect(client_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
-        perror("[-] Error to connect");
-        close(client_sock);
-        return 1;
-    }
-    printf("[+] Connected to server\n");
-
-    snprintf(mensaje, sizeof(mensaje), "%s %s", clave, shift);
-    send(client_sock, mensaje, strlen(mensaje), 0);
-    printf("[+][Client] Key and shift was sent: %s\n", mensaje);
-
-    // Esperamos la respuesta del servidor
-    int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
-    if (bytes > 0){
-        buffer[bytes] = '\0';
-        printf("[+][Client] Server message: %s\n", buffer);
-        if (strstr(buffer, "ACCESS GRANTED") != NULL){
-            FILE *fp = fopen("info.txt", "w");
-            if (fp == NULL){
-                perror("[-] Error to open the file");
-                close(client_sock);
-                return 1;
-            }
-            while ((bytes = recv(client_sock, buffer, sizeof(buffer), 0)) > 0){
-                fwrite(buffer, 1, bytes, fp);
-            }
-            printf("[+][Client] The file was save like 'info.txt'\n");
-            fclose(fp);
+    // Conectarse a los 3 servidores
+    for (int i = 0; i < 3; i++) {
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock < 0) {
+            perror("Socket creation failed");
+            continue;
         }
+
+        struct sockaddr_in serv_addr;
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(servers[i]);
+        inet_pton(AF_INET, server_ip, &serv_addr.sin_addr);
+
+        if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("Connection to server %d failed.\n", servers[i]);
+        close(sock);
+        continue;
     }
-    else{
-        printf("[-] Server connection tiemeout\n");
-    }
-    close(client_sock);
+
+        // Enviar datos
+        snprintf(buffer, sizeof(buffer), "%s|%s|%s", target_port, shift, file_content);
+        send(sock, buffer, strlen(buffer), 0);
+    
+        // Recibir respuesta
+        char response[BUFFER_SIZE] = {0};
+        int bytes = read(sock, response, sizeof(response) - 1);
+        if (bytes > 0) {
+            response[bytes] = '\0';
+            printf("[*] SERVER RESPONSE %d: %s\n", servers[i], response);
+        } else {
+            printf("[*] SERVER RESPONSE %d: (no response)\n", servers[i]);
+        }
+    
+        close(sock);
+        }
+
     return 0;
 }
