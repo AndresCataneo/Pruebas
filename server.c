@@ -310,7 +310,12 @@ int main(int argc, char *argv[]){
         perror("[-] Error to create the socket");
         return 1;
     }
-
+    int opt = 1;
+    if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("[-] Error on setsockopt");
+        close(server_sock);
+        return 1;
+    }
     //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
@@ -364,10 +369,11 @@ int main(int argc, char *argv[]){
     if (requested_port == PORT){
         // Aplicar cifrado César
         encryptCaesar(file_content, shift);
-        char response[BUFFER_SIZE];
-        snprintf(response, sizeof(response), "File received and encrypted:\n%s\n", file_content);
+        //char response[BUFFER_SIZE];
+        char *response = "File received and encrypted";
         send(client_sock, response, strlen(response), 0);
-        printf("[SERVER %d] Request accepted. File encrypted.\n", PORT);
+        printf("[SERVER %d] Request accepted.\n", PORT);
+        printf("[SERVER %d] File received and encrypted:\n%s\n", PORT, file_content);
     } else {
         char rejected_msg[BUFFER_SIZE];
         snprintf(rejected_msg, sizeof(rejected_msg), "REJECTED\n");
