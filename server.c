@@ -8,8 +8,10 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#define PORT 7006        // Puerto en el que el servidor escucha
+//#define PORT 7006        // Puerto en el que el servidor escucha
 #define BUFFER_SIZE 1024 // Tamaño del buffer para recibir datos
+
+//server.c
 
 /*
     Función para desencriptar texto usando el cifrado César
@@ -27,6 +29,22 @@ void decryptCaesar(char *text, int shift){
         }
         else{
             text[i] = c;
+        }
+    }
+}
+
+/*
+    Función para encriptar texto usando el cifrado César
+*/
+void encryptCaesar(char *text, int shift) {
+    // Ajustamos el desplazamiento y verificamos si las letras son mayúsculas o minúsculas
+    shift = shift % 26; 
+    for (int i = 0; text[i] != '\0'; i++) {
+        char c = text[i];
+        if (isupper(c)) { 
+            text[i] = ((c - 'A' + shift) % 26) + 'A';
+        } else if (islower(c)) {
+            text[i] = ((c - 'a' + shift) % 26) + 'a';
         }
     }
 }
@@ -272,13 +290,18 @@ void saveSystemInfo(const char *outputFile){
 /*
     Función principal con la configuración del socket
 */
-int main()
-{
+int main(){
+    if (argc != 2) {
+        printf("USE: %s <PORT>\n", argv[0]);
+        exit(1);
+    }
+
+    int PORT = atoi(argv[1]);
     int server_sock, client_sock;
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_size;
     char buffer[BUFFER_SIZE] = {0};
-    char clave[BUFFER_SIZE];
+    char file[BUFFER_SIZE] = {0};
     int shift;
 
     // Creamos el socket del servidor para la comunicación
@@ -318,40 +341,38 @@ int main()
     }
     printf("[+] Client conneted\n");
 
-    //Recibimos la clave encriptada + desplazamiento
+    //Recibimos <PORT>|<SHIFT>|<File>
     int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
     if (bytes <= 0){
-        printf("[-] Missed key\n");
+            printf("[-] Missed file\n");
+            close(client_sock);
+            close(server_sock);
+            return 1;
+    }
+    buffer[bytes] = '\0';
+
+    // Extraer puerto solicitado, desplazamiento y contenido del archivo
+    if (sscanf(buffer, "%d|%d|%[^\n]", &requested_port, &shift, file_content) != 3){
+        char *msg = "Invalid format. Use: <PORT>|<SHIFT>|<CONTENT>\n";
+        send(client_sock, msg, strlen(msg), 0);
         close(client_sock);
         close(server_sock);
         return 1;
     }
-    buffer[bytes] = '\0';
 
-    // Extraemos la clave y desplazamiento del mensaje recibido
-    sscanf(buffer, "%s %d", clave, &shift); 
-    printf("[+][Server] Encrypted key obtained: %s\n", clave);
-
-
-    //Verificamos si la clave está en el archivo
-    if (isOnFile(clave)){
-        decryptCaesar(clave, shift);
-        printf("[+][Server] Key decrypted: %s\n", clave);
-        send(client_sock, "ACCESS GRANTED", strlen("ACCESS GRANTED"), 0);
-        
-        sleep(1); // Pequeña pausa para evitar colisión de datos
-        saveNetworkInfo("network_info.txt");
-        sendFile("network_info.txt", client_sock);
-        printf("[+] Sent file network_info.txt\n");
-        
-        sleep(1); // Pequeña pausa para evitar colisión de datos con network_info
-        saveSystemInfo("sysinfo.txt");
-        sendFile("sysinfo.txt", client_sock);
-        printf("[+] Sent file sysinfo.txt\n");
-    }
-    else{
-        send(client_sock, "ACCESS DENIED", strlen("ACCESS DENIED"), 0);
-        printf("[-][Server] Wrong Key\n");
+    // Verificar si el puerto solicitado coincide con este servidor
+    if (requested_port == PORT){
+        // Aplicar cifrado César
+        encryptCaesar(file_content, shift);
+        char response[BUFFER_SIZE];
+        snprintf(response, sizeof(response), "File received and encrypted:\n%s\n", file_content);
+        send(client_sock, response, strlen(response), 0);
+        printf("[SERVER %d] Request accepted. File encrypted.\n", PORT);
+    } else {
+        char rejected_msg[BUFFER_SIZE];
+        snprintf(rejected_msg, sizeof(rejected_msg), "REJECTED\n");
+        send(client_sock, rejected_msg, strlen(rejected_msg), 0);
+        printf("[SERVER %d] Request rejected (client requested port %d).\n", PORT, requested_port);
     }
     close(client_sock);
     close(server_sock);
