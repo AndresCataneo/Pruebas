@@ -309,10 +309,19 @@ int main(){
         }
 
         int opt = 1;
-        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
-            perror("[-] Error on setsockopt");
+        // Siempre seteamos SO_REUSEADDR
+        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            perror("setsockopt SO_REUSEADDR failed");
             return 1;
         }
+
+        // Solo seteamos SO_REUSEPORT si está definido en el sistema
+        #ifdef SO_REUSEPORT
+        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+            perror("setsockopt SO_REUSEPORT failed");
+            return 1;
+        }
+        #endif
         //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
         server_addr[i].sin_family = AF_INET;
         server_addr[i].sin_port = htons(ports[i]);
