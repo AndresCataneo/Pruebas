@@ -292,90 +292,113 @@ void saveSystemInfo(const char *outputFile){
 */
 int main(){
 
-    int PORT = atoi(argv[1]);
-    int server_sock, client_sock;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t addr_size;
+    int server_ports[3];
+    struct sockaddr_in server_addr[3];
+    fd_set readfds;
+    int max_fd = -1;
     char buffer[BUFFER_SIZE] = {0};
     char file_content[BUFFER_SIZE] = {0};
-    int shift;
-    int requested_port;
-    // Creamos el socket del servidor para la comunicación
-    server_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_sock == -1){
-        perror("[-] Error to create the socket");
-        return 1;
-    }
-    int opt = 1;
-    if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        perror("[-] Error on setsockopt");
-        close(server_sock);
-        return 1;
-    }
-    //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-
-    //Asignamos el socket a la dirección y puerto especificados
-    if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
-        perror("[-] Error binding");
-        close(server_sock);
-        return 1;
-    }
-
-    // Escuchamos conexiones entrantes
-    if (listen(server_sock, 1) < 0){
-        perror("[-] Error on listen");
-        close(server_sock);
-        return 1;
-    }
-    printf("[+] Server listening port %d...\n", PORT);
-
-    //Esperamos y aceptamos una conexión entrante
-    addr_size = sizeof(client_addr);
-    client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &addr_size);
-    if (client_sock < 0){
-        perror("[-] Error on accept");
-        close(server_sock);
-        return 1;
-    }
-    printf("[+] Client conneted\n");
-
-    //Recibimos <PORT>|<SHIFT>|<File>
+    int shift, requested_port;
     int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
-    if (bytes <= 0){
-            printf("[-] Missed file\n");
-            close(client_sock);
+
+    // Creamos los sockets 
+    for (int i = 0; i < 3; i++) {
+        server_socks[i] = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_socks[i] < 0) {
+            perror("[-] Error creating socket");
+            return 1;
+        }
+
+        int opt = 1;
+        if (setsockopt(server_socks[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            perror("[-] Error on setsockopt");
+            return 1;
+        }
+        
+        //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
+        server_addr[i].sin_family = AF_INET;
+        server_addr[i].sin_port = htons(ports[i]);
+        server_addr[i].sin_addr.s_addr = INADDR_ANY;
+    
+
+        //Asignamos el socket a la dirección y puerto especificados
+        if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
+            perror("[-] Error binding");
             close(server_sock);
             return 1;
-    }
-    buffer[bytes] = '\0';
+        }
 
-    // Extraemos el puerto solicitado, desplazamiento y contenido del archivo
-    if (sscanf(buffer, "%d|%d|%[^\n]", &requested_port, &shift, file_content) != 3){
-        char *msg = "Invalid format. Use: <PORT>|<SHIFT>|<CONTENT>\n";
-        send(client_sock, msg, strlen(msg), 0);
-        close(client_sock);
-        close(server_sock);
-        return 1;
+        // Escuchamos conexiones entrantes
+        if (listen(server_sock, 1) < 0){
+            perror("[-] Error on listen");
+            close(server_sock);
+            return 1;
+        }
+
+        printf("[+] Server listening on port %d...\n", ports[i]);
+
+        if (server_socks[i] > max_fd) {
+            max_fd = server_socks[i];
+        }
     }
 
-    // Verificamos si el puerto solicitado coincide con el del servidor
-    if (requested_port == PORT){
-        encryptCaesar(file_content, shift);
-        //char response[BUFFER_SIZE];
-        char *response = "File received and encrypted";
-        send(client_sock, response, strlen(response), 0);
-        printf("[SERVER %d] Request accepted.\n", PORT);
-        printf("[SERVER %d] File received and encrypted:\n%s\n", PORT, file_content);
-    } else {
-        char rejected_msg[BUFFER_SIZE];
-        snprintf(rejected_msg, sizeof(rejected_msg), "REJECTED\n");
-        send(client_sock, rejected_msg, strlen(rejected_msg), 0);
-        printf("[SERVER %d] Request rejected (client requested port %d).\n", PORT, requested_port);
+    int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
+    int remaining = 3;
+
+    while (remaining > 0) {
+        FD_ZERO(&readfds);
+        for (int i = 0; i < 3; i++) {
+            if (!processed[i])
+                FD_SET(server_socks[i], &readfds);
+        }
+
+        int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
+        if (activity < 0) { perror("select error"); continue; }
+
+        for (int i = 0; i < 3; i++) {
+            if (!processed[i] && FD_ISSET(server_socks[i], &readfds)) {
+                struct sockaddr_in client_addr;
+                socklen_t addr_size = sizeof(client_addr);
+                int client_sock = accept(server_socks[i], (struct sockaddr*)&client_addr, &addr_size);
+                if (client_sock < 0) { perror("Accept error"); continue; }
+
+                char buffer[BUFFER_SIZE] = {0}, file_content[BUFFER_SIZE] = {0};
+                int requested_port, shift;
+
+                int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
+                if (bytes > 0) {
+                    buffer[bytes] = '\0';
+                    if (sscanf(buffer, "%d|%d|%[^\n]", &requested_port, &shift, file_content) == 3) {
+                        if (requested_port == ports[i] && shift == 34) {
+                            encryptCaesar(file_content, shift);
+                            char *msg = "File received and encrypted";
+                            send(client_sock, msg, strlen(msg), 0);
+                            printf("[SERVER %d] File encrypted:\n%s\n", ports[i], file_content);
+                        } else {
+                            char *msg = "REJECTED\n";
+                            send(client_sock, msg, strlen(msg), 0);
+                            printf("[SERVER %d] Request rejected.\n", ports[i]);
+                        }
+                    } else {
+                        char *msg = "REJECTED\n";
+                        send(client_sock, msg, strlen(msg), 0);
+                        printf("[SERVER %d] Invalid format. Request rejected.\n", ports[i]);
+                    }
+                } else {
+                    char *msg = "REJECTED\n";
+                    send(client_sock, msg, strlen(msg), 0);
+                    printf("[SERVER %d] No data received. Request rejected.\n", ports[i]);
+                }
+
+                close(client_sock);
+                processed[i] = 1;
+                remaining--;
+            }
+        }
     }
-    close(client_sock);
-    close(server_sock);
+    // Cerrar sockets de servidor
+    for (int i = 0; i < 3; i++){
+        close(server_socks[i]);
+    }
     return 0;
 }
