@@ -10,7 +10,7 @@
 
 //#define PORT 7006        // Puerto en el que el servidor escucha
 #define BUFFER_SIZE 1024 // Tamaño del buffer para recibir datos
-
+int ports[] = {49200, 49201, 49202}; // Puertos en los que el servidor escucha
 //server.c
 
 /*
@@ -321,16 +321,16 @@ int main(){
     
 
         //Asignamos el socket a la dirección y puerto especificados
-        if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
+        if (bind(server_ports[i], (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
             perror("[-] Error binding");
-            close(server_sock);
+            close(server_ports[i]);
             return 1;
         }
 
         // Escuchamos conexiones entrantes
-        if (listen(server_sock, 1) < 0){
+        if (listen(server_ports[i], 1) < 0){
             perror("[-] Error on listen");
-            close(server_sock);
+            close(server_ports[i]);
             return 1;
         }
 
