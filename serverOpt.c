@@ -354,21 +354,27 @@ int main(){
     while (1) {
         FD_ZERO(&readfds);
         for (int i = 0; i < 3; i++) {
-            if (!processed[i])
-                FD_SET(server_ports[i], &readfds);
+            FD_SET(server_sockets[i], &readfds);
         }
 
         int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
-        if (activity < 0) { perror("select error"); continue; }
+        if (activity < 0) {
+            perror("select error");
+            continue;
+        }
 
         for (int i = 0; i < 3; i++) {
-            if (!processed[i] && FD_ISSET(server_ports[i], &readfds)) {
+            if (FD_ISSET(server_sockets[i], &readfds)) {
                 struct sockaddr_in client_addr;
                 socklen_t addr_size = sizeof(client_addr);
-                int client_sock = accept(server_ports[i], (struct sockaddr*)&client_addr, &addr_size);
-                if (client_sock < 0) { perror("Accept error"); continue; }
+                int client_sock = accept(server_sockets[i], (struct sockaddr*)&client_addr, &addr_size);
+                if (client_sock < 0) {
+                    perror("Accept error");
+                    continue;
+                }
 
-                char buffer[BUFFER_SIZE] = {0}, file_content[BUFFER_SIZE] = {0};
+                char buffer[BUFFER_SIZE] = {0};
+                char file_content[BUFFER_SIZE] = {0};
                 int requested_port, shift;
 
                 int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
@@ -376,14 +382,15 @@ int main(){
                     buffer[bytes] = '\0';
                     if (sscanf(buffer, "%d|%d|%[^\n]", &requested_port, &shift, file_content) == 3) {
                         if (requested_port == ports[i] && shift == 34) {
-                            encryptCaesar(file_content, shift);
+                            encryptCaesar(file_contenta, shift);
                             char *msg = "File received and encrypted";
                             send(client_sock, msg, strlen(msg), 0);
                             printf("[SERVER %d] File encrypted:\n%s\n", ports[i], file_content);
                         } else {
                             char *msg = "REJECTED\n";
                             send(client_sock, msg, strlen(msg), 0);
-                            printf("[SERVER %d] Request rejected.\n", ports[i]);
+                            printf("[SERVER %d] Request rejected. Port: %d, Shift: %d\n", 
+                                   ports[i], requested_port, shift);
                         }
                     } else {
                         char *msg = "REJECTED\n";
@@ -397,11 +404,10 @@ int main(){
                 }
 
                 close(client_sock);
-                processed[i] = 1;
-                remaining--;
             }
         }
     }
+
     // Cerrar sockets de servidor
     for (int i = 0; i < 3; i++){
         close(server_ports[i]);
