@@ -309,11 +309,10 @@ int main(){
         }
 
         int opt = 1;
-        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
             perror("[-] Error on setsockopt");
             return 1;
         }
-        
         //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
         server_addr[i].sin_family = AF_INET;
         server_addr[i].sin_port = htons(ports[i]);
