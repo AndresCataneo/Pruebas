@@ -334,7 +334,7 @@ int main(int argc, char *argv[]){
         close(server_sock);
         return 1;
     }
-    printf("[+] Server listening port %d...\n", PORT);
+    printf("[*] LISTENING %d...\n", PORT);
 
     //Esperamos y aceptamos una conexión entrante
     addr_size = sizeof(client_addr);
@@ -344,7 +344,6 @@ int main(int argc, char *argv[]){
         close(server_sock);
         return 1;
     }
-    printf("[+] Client conneted\n");
 
     //Recibimos <PORT>|<SHIFT>|<File>
     int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
@@ -368,7 +367,6 @@ int main(int argc, char *argv[]){
     // Verificamos si el puerto solicitado coincide con el del servidor
     if (requested_port == PORT && shift == 34){
         encryptCaesar(file_content, shift);
-        //char response[BUFFER_SIZE];
         char *response = "File received and encrypted";
         send(client_sock, response, strlen(response), 0);
         printf("[SERVER %d] Request accepted.\n", PORT);
