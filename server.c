@@ -356,7 +356,7 @@ int main(int argc, char *argv[]){
     }
     buffer[bytes] = '\0';
 
-    // Extraer puerto solicitado, desplazamiento y contenido del archivo
+    // Extraemos el puerto solicitado, desplazamiento y contenido del archivo
     if (sscanf(buffer, "%d|%d|%[^\n]", &requested_port, &shift, file_content) != 3){
         char *msg = "Invalid format. Use: <PORT>|<SHIFT>|<CONTENT>\n";
         send(client_sock, msg, strlen(msg), 0);
@@ -365,9 +365,8 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
-    // Verificar si el puerto solicitado coincide con este servidor
+    // Verificamos si el puerto solicitado coincide con el del servidor
     if (requested_port == PORT){
-        // Aplicar cifrado César
         encryptCaesar(file_content, shift);
         //char response[BUFFER_SIZE];
         char *response = "File received and encrypted";
