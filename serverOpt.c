@@ -351,30 +351,27 @@ int main(){
     //int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
     //int remaining = 3;
 
-    while (1) {
+     int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
+    int remaining = 3;
+
+    while (remaining > 0) {
         FD_ZERO(&readfds);
         for (int i = 0; i < 3; i++) {
-            FD_SET(server_ports[i], &readfds);
+            if (!processed[i])
+                FD_SET(server_ports[i], &readfds);
         }
 
         int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
-        if (activity < 0) {
-            perror("select error");
-            continue;
-        }
+        if (activity < 0) { perror("select error"); continue; }
 
         for (int i = 0; i < 3; i++) {
-            if (FD_ISSET(server_ports[i], &readfds)) {
+            if (!processed[i] && FD_ISSET(server_ports[i], &readfds)) {
                 struct sockaddr_in client_addr;
                 socklen_t addr_size = sizeof(client_addr);
                 int client_sock = accept(server_ports[i], (struct sockaddr*)&client_addr, &addr_size);
-                if (client_sock < 0) {
-                    perror("Accept error");
-                    continue;
-                }
+                if (client_sock < 0) { perror("Accept error"); continue; }
 
-                char buffer[BUFFER_SIZE] = {0};
-                char file_content[BUFFER_SIZE] = {0};
+                char buffer[BUFFER_SIZE] = {0}, file_content[BUFFER_SIZE] = {0};
                 int requested_port, shift;
 
                 int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
@@ -389,8 +386,7 @@ int main(){
                         } else {
                             char *msg = "REJECTED\n";
                             send(client_sock, msg, strlen(msg), 0);
-                            printf("[SERVER %d] Request rejected. Port: %d, Shift: %d\n", 
-                                   ports[i], requested_port, shift);
+                            printf("[SERVER %d] Request rejected.\n", ports[i]);
                         }
                     } else {
                         char *msg = "REJECTED\n";
@@ -404,6 +400,8 @@ int main(){
                 }
 
                 close(client_sock);
+                processed[i] = 1;
+                remaining--;
             }
         }
     }
