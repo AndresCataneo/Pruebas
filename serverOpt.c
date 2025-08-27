@@ -354,7 +354,7 @@ int main(){
     while (1) {
         FD_ZERO(&readfds);
         for (int i = 0; i < 3; i++) {
-            FD_SET(server_sockets[i], &readfds);
+            FD_SET(server_ports[i], &readfds);
         }
 
         int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
@@ -364,10 +364,10 @@ int main(){
         }
 
         for (int i = 0; i < 3; i++) {
-            if (FD_ISSET(server_sockets[i], &readfds)) {
+            if (FD_ISSET(server_ports[i], &readfds)) {
                 struct sockaddr_in client_addr;
                 socklen_t addr_size = sizeof(client_addr);
-                int client_sock = accept(server_sockets[i], (struct sockaddr*)&client_addr, &addr_size);
+                int client_sock = accept(server_ports[i], (struct sockaddr*)&client_addr, &addr_size);
                 if (client_sock < 0) {
                     perror("Accept error");
                     continue;
@@ -382,7 +382,7 @@ int main(){
                     buffer[bytes] = '\0';
                     if (sscanf(buffer, "%d|%d|%[^\n]", &requested_port, &shift, file_content) == 3) {
                         if (requested_port == ports[i] && shift == 34) {
-                            encryptCaesar(file_contenta, shift);
+                            encryptCaesar(file_content, shift);
                             char *msg = "File received and encrypted";
                             send(client_sock, msg, strlen(msg), 0);
                             printf("[SERVER %d] File encrypted:\n%s\n", ports[i], file_content);
@@ -407,7 +407,6 @@ int main(){
             }
         }
     }
-
     // Cerrar sockets de servidor
     for (int i = 0; i < 3; i++){
         close(server_ports[i]);
