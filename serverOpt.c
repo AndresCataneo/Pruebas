@@ -290,15 +290,15 @@ void saveSystemInfo(const char *outputFile){
 /*
     Función principal con la configuración del socket
 */
-int main(){
-
+int main() {
     int server_ports[3];
     struct sockaddr_in server_addr[3];
     fd_set readfds;
     int max_fd = -1;
-    char buffer[BUFFER_SIZE] = {0};
-    char file_content[BUFFER_SIZE] = {0};
-    int shift, requested_port;
+    
+    // Bandera para controlar cuáles puertos han sido procesados
+    int processed[3] = {0, 0, 0};
+    int remaining = 3;
 
     // Creamos los sockets 
     for (int i = 0; i < 3; i++) {
@@ -322,20 +322,20 @@ int main(){
             return 1;
         }
         #endif
-        //Configuramos la dirección del servidor (IPv4, puerto, cualquier IP local).
+        
+        // Configuramos la dirección del servidor
         server_addr[i].sin_family = AF_INET;
         server_addr[i].sin_port = htons(ports[i]);
         server_addr[i].sin_addr.s_addr = INADDR_ANY;
     
-
-        //Asignamos el socket a la dirección y puerto especificados
+        // Asignamos el socket a la dirección y puerto especificados
         if (bind(server_ports[i], (struct sockaddr *)&server_addr[i], sizeof(server_addr[i])) < 0) {
             perror("bind");
             exit(1);
         }
 
         // Escuchamos conexiones entrantes
-        if (listen(server_ports[i], 1) < 0){
+        if (listen(server_ports[i], 1) < 0) {
             perror("[-] Error on listen");
             close(server_ports[i]);
             return 1;
@@ -348,30 +348,38 @@ int main(){
         }
     }
 
-    //int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
-    //int remaining = 3;
+    printf("[+] All ports ready. Waiting for connections...\n");
 
-     int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
-    int remaining = 3;
-
+    // Mientras queden puertos por procesar
     while (remaining > 0) {
         FD_ZERO(&readfds);
+        
+        // Solo monitorear los puertos que no han sido procesados
         for (int i = 0; i < 3; i++) {
-            if (!processed[i])
+            if (!processed[i]) {
                 FD_SET(server_ports[i], &readfds);
+            }
         }
 
         int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
-        if (activity < 0) { perror("select error"); continue; }
+        if (activity < 0) {
+            perror("select error");
+            continue;
+        }
 
         for (int i = 0; i < 3; i++) {
+            // Solo procesar si el puerto no ha sido atendido y está listo
             if (!processed[i] && FD_ISSET(server_ports[i], &readfds)) {
                 struct sockaddr_in client_addr;
                 socklen_t addr_size = sizeof(client_addr);
                 int client_sock = accept(server_ports[i], (struct sockaddr*)&client_addr, &addr_size);
-                if (client_sock < 0) { perror("Accept error"); continue; }
+                if (client_sock < 0) {
+                    perror("Accept error");
+                    continue;
+                }
 
-                char buffer[BUFFER_SIZE] = {0}, file_content[BUFFER_SIZE] = {0};
+                char buffer[BUFFER_SIZE] = {0};
+                char file_content[BUFFER_SIZE] = {0};
                 int requested_port, shift;
 
                 int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
@@ -386,7 +394,8 @@ int main(){
                         } else {
                             char *msg = "REJECTED\n";
                             send(client_sock, msg, strlen(msg), 0);
-                            printf("[SERVER %d] Request rejected.\n", ports[i]);
+                            printf("[SERVER %d] Request rejected. Port: %d, Shift: %d\n", 
+                                   ports[i], requested_port, shift);
                         }
                     } else {
                         char *msg = "REJECTED\n";
@@ -400,14 +409,22 @@ int main(){
                 }
 
                 close(client_sock);
+                
+                // Marcar este puerto como procesado
                 processed[i] = 1;
                 remaining--;
+                printf("[+] Port %d processed. Remaining: %d\n", ports[i], remaining);
             }
         }
     }
+    
     // Cerrar sockets de servidor
-    for (int i = 0; i < 3; i++){
+    printf("[+] All ports processed. Closing server...\n");
+    for (int i = 0; i < 3; i++) {
         close(server_ports[i]);
+        printf("[+] Port %d closed\n", ports[i]);
     }
+    
+    printf("[+] Server terminated successfully\n");
     return 0;
 }
