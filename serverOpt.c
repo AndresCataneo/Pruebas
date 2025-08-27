@@ -302,14 +302,14 @@ int main(){
 
     // Creamos los sockets 
     for (int i = 0; i < 3; i++) {
-        server_socks[i] = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_socks[i] < 0) {
+        server_ports[i] = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_ports[i] < 0) {
             perror("[-] Error creating socket");
             return 1;
         }
 
         int opt = 1;
-        if (setsockopt(server_socks[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
             perror("[-] Error on setsockopt");
             return 1;
         }
@@ -336,8 +336,8 @@ int main(){
 
         printf("[+] Server listening on port %d...\n", ports[i]);
 
-        if (server_socks[i] > max_fd) {
-            max_fd = server_socks[i];
+        if (server_ports[i] > max_fd) {
+            max_fd = server_ports[i];
         }
     }
 
@@ -348,17 +348,17 @@ int main(){
         FD_ZERO(&readfds);
         for (int i = 0; i < 3; i++) {
             if (!processed[i])
-                FD_SET(server_socks[i], &readfds);
+                FD_SET(server_ports[i], &readfds);
         }
 
         int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
         if (activity < 0) { perror("select error"); continue; }
 
         for (int i = 0; i < 3; i++) {
-            if (!processed[i] && FD_ISSET(server_socks[i], &readfds)) {
+            if (!processed[i] && FD_ISSET(server_ports[i], &readfds)) {
                 struct sockaddr_in client_addr;
                 socklen_t addr_size = sizeof(client_addr);
-                int client_sock = accept(server_socks[i], (struct sockaddr*)&client_addr, &addr_size);
+                int client_sock = accept(server_ports[i], (struct sockaddr*)&client_addr, &addr_size);
                 if (client_sock < 0) { perror("Accept error"); continue; }
 
                 char buffer[BUFFER_SIZE] = {0}, file_content[BUFFER_SIZE] = {0};
@@ -397,7 +397,7 @@ int main(){
     }
     // Cerrar sockets de servidor
     for (int i = 0; i < 3; i++){
-        close(server_socks[i]);
+        close(server_ports[i]);
     }
     return 0;
 }
