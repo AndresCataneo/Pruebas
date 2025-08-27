@@ -309,19 +309,11 @@ int main() {
         }
 
         int opt = 1;
-        // Siempre seteamos SO_REUSEADDR
+        
         if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
             perror("setsockopt SO_REUSEADDR failed");
             return 1;
         }
-
-        // Solo seteamos SO_REUSEPORT si está definido en el sistema
-        #ifdef SO_REUSEPORT
-        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
-            perror("setsockopt SO_REUSEPORT failed");
-            return 1;
-        }
-        #endif
         
         // Configuramos la dirección del servidor
         server_addr[i].sin_family = AF_INET;
@@ -351,6 +343,11 @@ int main() {
     printf("[+] All ports ready. Waiting for connections...\n");
 
     // Mientras queden puertos por procesar
+   struct timeval timeout;
+    timeout.tv_sec = 10;  // 10 segundos de timeout
+    timeout.tv_usec = 0;
+
+    // Mientras queden puertos por procesar
     while (remaining > 0) {
         FD_ZERO(&readfds);
         
@@ -361,7 +358,21 @@ int main() {
             }
         }
 
-        int activity = select(max_fd + 1, &readfds, NULL, NULL, NULL);
+        int activity = select(max_fd + 1, &readfds, NULL, NULL, &timeout);
+        
+        if (activity == 0) {
+            // Timeout - rechazar puertos pendientes
+            printf("[+] Timeout reached. Rejecting remaining ports...\n");
+            for (int i = 0; i < 3; i++) {
+                if (!processed[i]) {
+                    printf("[SERVER %d] REJECTED (timeout)\n", ports[i]);
+                    processed[i] = 1;
+                    remaining--;
+                }
+            }
+            break;
+        }
+        
         if (activity < 0) {
             perror("select error");
             continue;
@@ -416,15 +427,14 @@ int main() {
                 printf("[+] Port %d processed. Remaining: %d\n", ports[i], remaining);
             }
         }
+        
+        // Resetear timeout para la siguiente iteración
+        timeout.tv_sec = 10;
+        timeout.tv_usec = 0;
     }
     
-    // Cerrar sockets de servidor
-    printf("[+] All ports processed. Closing server...\n");
     for (int i = 0; i < 3; i++) {
         close(server_ports[i]);
-        printf("[+] Port %d closed\n", ports[i]);
     }
-    
-    printf("[+] Server terminated successfully\n");
     return 0;
 }
