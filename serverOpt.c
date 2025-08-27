@@ -299,7 +299,6 @@ int main(){
     char buffer[BUFFER_SIZE] = {0};
     char file_content[BUFFER_SIZE] = {0};
     int shift, requested_port;
-    int bytes = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
     // Creamos los sockets 
     for (int i = 0; i < 3; i++) {
