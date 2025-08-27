@@ -329,10 +329,9 @@ int main(){
     
 
         //Asignamos el socket a la dirección y puerto especificados
-        if (bind(server_ports[i], (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
-            perror("[-] Error binding");
-            close(server_ports[i]);
-            return 1;
+        if (bind(server_ports[i], (struct sockaddr *)&server_addr[i], sizeof(server_addr[i])) < 0) {
+            perror("bind");
+            exit(1);
         }
 
         // Escuchamos conexiones entrantes
@@ -349,10 +348,10 @@ int main(){
         }
     }
 
-    int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
-    int remaining = 3;
+    //int processed[3] = {0,0,0}; // bandera si cada puerto ya recibió algo
+    //int remaining = 3;
 
-    while (remaining > 0) {
+    while (1) {
         FD_ZERO(&readfds);
         for (int i = 0; i < 3; i++) {
             if (!processed[i])
