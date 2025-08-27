@@ -366,7 +366,7 @@ int main(int argc, char *argv[]){
     }
 
     // Verificamos si el puerto solicitado coincide con el del servidor
-    if (requested_port == PORT){
+    if (requested_port == PORT && shift == 34){
         encryptCaesar(file_content, shift);
         //char response[BUFFER_SIZE];
         char *response = "File received and encrypted";
