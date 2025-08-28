@@ -169,7 +169,7 @@ int main() {
         }
         
         // Reseteamos el timeout para la siguiente iteración
-        timeout.tv_sec = 5;
+        timeout.tv_sec = 10;
         timeout.tv_usec = 0;
     }
     
