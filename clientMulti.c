@@ -33,8 +33,9 @@ int main(int argc, char *argv[]) {
     int client_sock;
     struct sockaddr_in serv_addr;
 
+    int i;
     //Encontramos los puertos en la entrada
-    for (int i = 2; i < argc; i++) {
+    for (i = 2; i < argc; i++) {
         if (is_number(argv[i]) && num_ports < 3) {
             ports[num_ports++] = atoi(argv[i]);
         } else {
@@ -43,7 +44,7 @@ int main(int argc, char *argv[]) {
     }
 
     //Encontramos el shift en la entrada
-    if (int i < argc && is_number(argv[argc - 1])) {
+    if (i < argc && is_number(argv[argc - 1])) {
         shift = atoi(argv[argc - 1]);
         num_files = argc - 1 - i;
     } else {
