@@ -8,6 +8,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 
+//serverOpt.c
+
 //#define PORT 7006        // Puerto en el que el servidor escucha
 #define BUFFER_SIZE 1024 // Tamaño del buffer para recibir datos
 int server_ports[] = {49200, 49201, 49202}; // Puertos en los que el servidor escucha
@@ -30,7 +32,8 @@ void encryptCaesar(char *text, int shift) {
 }
 
 /*
-    Función principal con la configuración del socket
+    Función principal que nos permite recibir el contenido del archivo que envió el cliente para cifrarlo.
+    Se utilizan los 3 puertos al mismo tiempo desde la misma terminal
 */
 int main() {
     int ports[3];
@@ -51,7 +54,7 @@ int main() {
         }
 
         int opt = 1;
-        
+        // Permitimos que se vuelva a usar el puerto después de termianr la ejecución del programa
         if (setsockopt(ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
             perror("setsockopt SO_REUSEADDR failed");
             return 1;
@@ -104,7 +107,7 @@ int main() {
             printf("[+] Timeout reached. Rejecting remaining ports...\n");
             for (int i = 0; i < 3; i++) {
                 if (!processed[i]) {
-                    printf("[SERVER %d] REJECTED (timeout)\n", server_ports[i]);
+                    printf("[SERVER %d] REJECTED\n", server_ports[i]);
                     processed[i] = 1;
                     remaining--;
                 }
@@ -143,22 +146,22 @@ int main() {
                             encryptCaesar(file_content, shift);
                             char *msg = "File received and encrypted";
                             send(client_sock, msg, strlen(msg), 0);
-                            printf("[SERVER %d] File encrypted:\n%s\n", server_ports[i], file_content, "\n");
+                            printf("[SERVER %d] File encrypted:\n%s\n", server_ports[i], file_content);
                         } else {
                             char *msg = "REJECTED\n";
                             send(client_sock, msg, strlen(msg), 0);
-                            printf("[SERVER %d] Request rejected. Port: %d, Shift: %d\n", 
-                                   server_ports[i], requested_port, shift);
+                            printf("[SERVER %d] REJECTED\n", 
+                                   server_ports[i]);
                         }
                     } else {
                         char *msg = "REJECTED\n";
                         send(client_sock, msg, strlen(msg), 0);
-                        printf("[SERVER %d] Invalid format. Request rejected.\n", server_ports[i]);
+                        printf("[SERVER %d] Invalid format. REJECTED\n", server_ports[i]);
                     }
                 } else {
                     char *msg = "REJECTED\n";
                     send(client_sock, msg, strlen(msg), 0);
-                    printf("[SERVER %d] No data received. Request rejected.\n", server_ports[i]);
+                    printf("[SERVER %d] No data received. REJECTED\n", server_ports[i]);
                 }
 
                 close(client_sock);
