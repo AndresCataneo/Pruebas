@@ -33,7 +33,7 @@ void encryptCaesar(char *text, int shift) {
     Función principal con la configuración del socket
 */
 int main() {
-    int server_ports[3];
+    int ports[3];
     struct sockaddr_in server_addr[3];
     fd_set readfds;
     int max_fd = -1;
@@ -44,15 +44,15 @@ int main() {
 
     // Creamos los sockets 
     for (int i = 0; i < 3; i++) {
-        server_ports[i] = socket(AF_INET, SOCK_STREAM, 0);
-        if (server_ports[i] < 0) {
+        ports[i] = socket(AF_INET, SOCK_STREAM, 0);
+        if (ports[i] < 0) {
             perror("[-] Error creating socket");
             return 1;
         }
 
         int opt = 1;
         
-        if (setsockopt(server_ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        if (setsockopt(ports[i], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
             perror("setsockopt SO_REUSEADDR failed");
             return 1;
         }
@@ -63,23 +63,23 @@ int main() {
         server_addr[i].sin_addr.s_addr = INADDR_ANY;
     
         // Asignamos el socket a la dirección y puerto especificados
-        if (bind(server_ports[i], (struct sockaddr *)&server_addr[i], sizeof(server_addr[i])) < 0) {
+        if (bind(ports[i], (struct sockaddr *)&server_addr[i], sizeof(server_addr[i])) < 0) {
             perror("[-] Error binding");
-            close(server_ports[i]);
+            close(ports[i]);
             return 1;
         }
 
         // Escuchamos conexiones entrantes
-        if (listen(server_ports[i], 1) < 0) {
+        if (listen(ports[i], 1) < 0) {
             perror("[-] Error on listen");
-            close(server_ports[i]);
+            close(ports[i]);
             return 1;
         }
-        
-        printf("[*] LISTENING %d...\n", PORT);
-        
-        if (server_ports[i] > max_fd) {
-            max_fd = server_ports[i];
+
+        printf("[*] LISTENING %d...\n", ports[i]);
+
+        if (ports[i] > max_fd) {
+            max_fd = ports[i];
         }
     }
 
@@ -93,7 +93,7 @@ int main() {
         // Monitoreamos los puertos que no han sido procesados
         for (int i = 0; i < 3; i++) {
             if (!processed[i]) {
-                FD_SET(server_ports[i], &readfds);
+                FD_SET(ports[i], &readfds);
             }
         }
 
@@ -119,10 +119,10 @@ int main() {
 
         for (int i = 0; i < 3; i++) {
             // Procesamos los puertos que no han sido atendidos
-            if (!processed[i] && FD_ISSET(server_ports[i], &readfds)) {
+            if (!processed[i] && FD_ISSET(ports[i], &readfds)) {
                 struct sockaddr_in client_addr;
                 socklen_t addr_size = sizeof(client_addr);
-                int client_sock = accept(server_ports[i], (struct sockaddr*)&client_addr, &addr_size);
+                int client_sock = accept(ports[i], (struct sockaddr*)&client_addr, &addr_size);
                 if (client_sock < 0) {
                     perror("Accept error");
                     continue;
@@ -175,7 +175,7 @@ int main() {
     }
     
     for (int i = 0; i < 3; i++) {
-        close(server_ports[i]);
+        close(ports[i]);
     }
     return 0;
 }
