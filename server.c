@@ -304,13 +304,16 @@ int main(int argc, char *argv[]){
     char file_content[BUFFER_SIZE] = {0};
     int shift;
     int requested_port;
+    
     // Creamos el socket del servidor para la comunicación
     server_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (server_sock == -1){
         perror("[-] Error to create the socket");
         return 1;
     }
+    
     int opt = 1;
+    // Permitir la reutilización de la dirección después de cerrar el socket
     if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("[-] Error on setsockopt");
         close(server_sock);
