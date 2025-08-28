@@ -333,14 +333,10 @@ int main() {
             return 1;
         }
 
-        printf("[+] Server listening on port %d...\n", ports[i]);
-
         if (server_ports[i] > max_fd) {
             max_fd = server_ports[i];
         }
     }
-
-    printf("[+] All ports ready. Waiting for connections...\n");
 
     // Mientras queden puertos por procesar
    struct timeval timeout;
@@ -421,15 +417,14 @@ int main() {
 
                 close(client_sock);
                 
-                // Marcar este puerto como procesado
                 processed[i] = 1;
                 remaining--;
                 printf("[+] Port %d processed. Remaining: %d\n", ports[i], remaining);
             }
         }
         
-        // Resetear timeout para la siguiente iteración
-        timeout.tv_sec = 10;
+        // Reseteamos el timeout para la siguiente iteración
+        timeout.tv_sec = 5;
         timeout.tv_usec = 0;
     }
     
