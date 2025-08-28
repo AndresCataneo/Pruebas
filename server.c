@@ -114,8 +114,8 @@ int main(int argc, char *argv[]){
         encryptCaesar(file_content, shift);
         char *response = "File received and encrypted";
         send(client_sock, response, strlen(response), 0);
-        printf("[SERVER %d] Request accepted.\n", PORT);
-        printf("[SERVER %d] File received and encrypted:\n%s\n", PORT, file_content);
+        printf("[*] SERVER RESPONSE %d", PORT);
+        printf("[*] SERVER RESPONSE %d File received and encrypted:\n%s\n", PORT, file_content);
     } else {
         char rejected_msg[BUFFER_SIZE];
         snprintf(rejected_msg, sizeof(rejected_msg), "REJECTED\n");
