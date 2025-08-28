@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     }
 
     //Encontramos el shift en la entrada
-    if (i < argc && is_number(argv[argc - 1])) {
+    if (int i < argc && is_number(argv[argc - 1])) {
         shift = atoi(argv[argc - 1]);
         num_files = argc - 1 - i;
     } else {
