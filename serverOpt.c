@@ -165,7 +165,6 @@ int main() {
                 
                 processed[i] = 1;
                 remaining--;
-                printf("[+] Port %d processed. Remaining: %d\n", ports[i], remaining);
             }
         }
         
