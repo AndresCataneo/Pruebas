@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
         inet_pton(AF_INET, server_ip, &serv_addr.sin_addr);
 
         if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("Connection to server %d failed.\n", ports[i]);
+        printf("[*] Connection to server %d failed.\n", ports[i]);
         close(sock);
         continue;
     }
