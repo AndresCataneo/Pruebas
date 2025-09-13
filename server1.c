@@ -23,8 +23,14 @@ void get_timestamp(char *buffer, size_t size) {
 // Función para guardar archivo
 void save_file(const char *server_name, const char *filename, const char *content) {
     char file_path[256];
-    snprintf(file_path, sizeof(file_path), "/home/%s/%s", server_name, filename);
+    char *home_dir = getenv("HOME");
+    if (home_dir == NULL) {
+        // Fallback: usar el home por defecto del usuario actual
+        home_dir = "/home";
+        printf("Warning: HOME environment variable not set, using %s\n", home_dir);
+    }
     
+    snprintf(file_path, sizeof(file_path), "%s/%s/%s", home_dir, server_name, filename);
     FILE *file = fopen(file_path, "w");
     if (file) {
         fprintf(file, "%s", content);
