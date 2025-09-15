@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         }
 
         char buffer[BUFFER_SIZE*2];
-        snprintf(buffer, sizeof(buffer), "%d|%s|%s", port, filename, file_content);
+        snprintf(buffer, sizeof(buffer), "%s|%s|%s", server_ip, filename, file_content);
 
         if (send(dynamic_sock, buffer, strlen(buffer), 0) < 0) {
             perror("Send failed");
