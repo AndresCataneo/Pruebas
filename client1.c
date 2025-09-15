@@ -46,7 +46,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-
+    char file_content[BUFFER_SIZE] = {0};
+    size_t bytes_read = fread(file_content, 1, sizeof(file_content) - 1, fp);
+    file_content[bytes_read] = '\0';
+    fclose(fp);
 
     //Creamos el socket del cliente para la comunicación
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
