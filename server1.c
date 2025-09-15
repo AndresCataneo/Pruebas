@@ -11,20 +11,27 @@
 #include <sys/stat.h>
 
 #define BUFFER_SIZE 1024
-#define BASE_PORT 49200  // Puerto base único
+#define server_port 49200  // Puerto base 
 
-// Función para obtener timestamp
-void get_timestamp(char *buffer, size_t size) {
+/*
+    Función para obtener la fecha y hora actual 
+*/
+void getTimeDate(char *buffer, size_t size) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     strftime(buffer, size, "%Y-%m-%d %H:%M:%S", t);
 }
 
-// Función para guardar archivo
-void save_file(const char *server_name, const char *filename, const char *content) {
+// Función para guardar archivo en el directorio del servidor
+void saveFile(const char *server_name, const char *filename, const char *content) {
     char file_path[256];
-    snprintf(file_path, sizeof(file_path), "/home/%s/%s", server_name, filename);
+    char *home_dir = getenv("HOME");
+    if (home_dir == NULL) {
+        home_dir = "/home";
+        printf("Warning: HOME environment variable not set, using %s\n", home_dir);
+    }
     
+    snprintf(file_path, sizeof(file_path), "%s/%s/%s", home_dir, server_name, filename);
     FILE *file = fopen(file_path, "w");
     if (file) {
         fprintf(file, "%s", content);
@@ -32,82 +39,79 @@ void save_file(const char *server_name, const char *filename, const char *conten
     }
 }
 
+/*
+    Función principal para conectar el servidor en el puerto 49200 y asignar puertos dinámicos a los clientes
+    para recibir archivos y guardarlos en el directorio correspondiente (s01 o s02)
+*/
 int main(int argc, char *argv[]) {
-    // Verificar argumentos (nombres de servidores)
+
+    int port_s;
+    int client_port; 
+    struct sockaddr_in server_addr;
+    int port_counter = 1;
+
     if (argc < 2) {
         printf("Use: %s <s01> <s02> ...\n", argv[0]);
         return 1;
     }
 
-    // Crear directorios para cada servidor
-    for (int i = 1; i < argc; i++) {
-        char dir_path[256];
-        snprintf(dir_path, sizeof(dir_path), "/home/%s", argv[i]);
-        mkdir(dir_path, 0755);
-        printf("[+] Created directory: %s\n", dir_path);
-    }
-
-    // Crear socket principal para el puerto base
-    int main_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (main_sock < 0) {
+    // Creamos el socket principal para el puerto base
+    port_s = socket(AF_INET, SOCK_STREAM, 0);
+    if (port_s < 0) {
         perror("[-] Error creating socket");
         return 1;
     }
 
     int opt = 1;
-    if (setsockopt(main_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+    // Permitimos que se vuelva a usar el puerto después de termianr la ejecución del programa
+    if (setsockopt(port_s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("setsockopt SO_REUSEADDR failed");
         return 1;
     }
     
-    struct sockaddr_in server_addr;
+    // Configuramos la dirección del servidor
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(BASE_PORT);
+    server_addr.sin_port = htons(server_port);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(main_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    // Asignamos el socket a la dirección y puerto especificados
+    if (bind(port_s, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("[-] Error binding");
-        close(main_sock);
+        close(port_s);
         return 1;
     }
 
-    if (listen(main_sock, 5) < 0) {
+    // Escuchamos conexiones entrantes
+    if (listen(port_s, 10) < 0) {
         perror("[-] Error on listen");
-        close(main_sock);
+        close(port_s);
         return 1;
     }
 
-    printf("[*] LISTENING on base port %d...\n", BASE_PORT);
-    printf("[+] Server started. Waiting for connections...\n");
+    printf("[*] LISTENING on base port %d...\n", server_port);
+    printf("[*] Server started. Waiting for connections...\n");
 
-    int dynamic_port_counter = 1;  // Contador para puertos dinámicos
-
-    // Bucle infinito - servidor siempre escuchando
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t addr_size = sizeof(client_addr);
-        int client_sock = accept(main_sock, (struct sockaddr*)&client_addr, &addr_size);
+        client_port = accept(port_s, (struct sockaddr*)&client_addr, &addr_size);
         
-        if (client_sock < 0) {
+        if (client_port < 0) {
             perror("Accept error");
             continue;
         }
 
-        // ASIGNAR PUERTO DINÁMICO (49200 + counter)
-        int dynamic_port = BASE_PORT + dynamic_port_counter;
-        dynamic_port_counter++;
-        
-        if (dynamic_port_counter > 100) {
-            dynamic_port_counter = 1;  // Resetear después de 100 puertos
-        }
+        // Asignamos un puerto dinámico al cliente mayor al puerto base
+        int dynamic_port = server_port + port_counter;
+        port_counter++;
 
-        // Enviar puerto dinámico al cliente
+        // Enviamos el puerto dinámico al cliente
         char port_msg[64];
         snprintf(port_msg, sizeof(port_msg), "DYNAMIC_PORT|%d", dynamic_port);
-        send(client_sock, port_msg, strlen(port_msg), 0);
-        close(client_sock);
+        send(client_port, port_msg, strlen(port_msg), 0);
+        close(client_port);
 
-        // Crear socket para puerto dinámico
+        // Creamos el socket para el puerto dinámico
         int dynamic_sock = socket(AF_INET, SOCK_STREAM, 0);
         struct sockaddr_in dynamic_addr;
         
@@ -115,24 +119,27 @@ int main(int argc, char *argv[]) {
         dynamic_addr.sin_port = htons(dynamic_port);
         dynamic_addr.sin_addr.s_addr = INADDR_ANY;
         
-        // Configurar opciones del socket dinámico
+        // Permitimos que se vuelva a usar el puerto después de termianr la ejecución del programa
         int dyn_opt = 1;
         setsockopt(dynamic_sock, SOL_SOCKET, SO_REUSEADDR, &dyn_opt, sizeof(dyn_opt));
         
+        // Asignamos el socket a la dirección y puerto especificados
         if (bind(dynamic_sock, (struct sockaddr*)&dynamic_addr, sizeof(dynamic_addr)) < 0) {
             perror("Bind error on dynamic port");
             close(dynamic_sock);
             continue;
         }
         
+        // Escuchamos conexiones entrantes
         if (listen(dynamic_sock, 1) < 0) {
             perror("Listen error on dynamic port");
             close(dynamic_sock);
             continue;
         }
         
-        printf("[+] Assigned dynamic port %d to client\n", dynamic_port);
-        
+        printf("[*] Assigned dynamic port %d to client\n", dynamic_port);
+
+        // Aceptamos la conexión del cliente en el puerto dinámico
         int dynamic_client = accept(dynamic_sock, NULL, NULL);
         if (dynamic_client < 0) {
             perror("Accept error on dynamic port");
@@ -149,13 +156,12 @@ int main(int argc, char *argv[]) {
         if (bytes > 0) {
             buffer[bytes] = '\0';
             
-            // Parsear: PUERTO|NOMBRE_ARCHIVO|CONTENIDO
             if (sscanf(buffer, "%d|%255[^|]|%[^\n]", &requested_port, filename, file_content) == 3) {
-                // Determinar servidor basado en el puerto solicitado o otro criterio
+                // Determinamos el servidor basado en el puerto solicitado 
                 char *server_name = (requested_port % 2 == 0) ? "s01" : "s02";
                 
-                if (requested_port == BASE_PORT) {
-                    save_file(server_name, filename, file_content);
+                if (requested_port == server_port) {
+                    saveFile(server_name, filename, file_content);
                     
                     char *msg = "File received successfully";
                     send(dynamic_client, msg, strlen(msg), 0);
@@ -172,6 +178,6 @@ int main(int argc, char *argv[]) {
         close(dynamic_sock);
     }
     
-    close(main_sock);
+    close(port_s);
     return 0;
 }
