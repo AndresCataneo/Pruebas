@@ -51,6 +51,11 @@ int main(int argc, char *argv[]) {
     file_content[bytes_read] = '\0';
     fclose(fp);
 
+    struct addrinfo hints, *res;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    
     //Creamos el socket del cliente para la comunicación
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (client_sock < 0) {
