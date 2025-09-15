@@ -54,6 +54,12 @@ int main(int argc, char *argv[]) {
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
+    
+    if (getaddrinfo(server_ip, NULL, &hints, &res) != 0) {
+        perror("Error resolving hostname");
+        saveLog("ERROR", filename, "Host resolution failed");
+        exit(1);
+    }
 
     //Creamos el socket del cliente para la comunicación
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -99,7 +105,7 @@ int main(int argc, char *argv[]) {
         }
 
         char buffer[BUFFER_SIZE*2];
-        snprintf(buffer, sizeof(buffer), "%s|%s|%s", argv[1], filename, file_content);
+        snprintf(buffer, sizeof(buffer), "%s|%s|%s", server_ip, filename, file_content);
 
         if (send(dynamic_sock, buffer, strlen(buffer), 0) < 0) {
             perror("Send failed");
