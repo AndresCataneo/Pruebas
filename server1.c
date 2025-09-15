@@ -156,21 +156,17 @@ int main(int argc, char *argv[]) {
         if (bytes > 0) {
             buffer[bytes] = '\0';
             
-            if (sscanf(buffer, "%d|%255[^|]|%[^\n]", &requested_port, filename, file_content) == 3) {
-                // Determinamos el servidor basado en el puerto solicitado 
-                char *server_name = (requested_port % 2 == 0) ? "s01" : "s02";
+            char alias[32];
+            if (sscanf(buffer, "%31[^|]|%255[^|]|%[^\n]", alias, filename, file_content) == 3) {
+                saveFile(alias, filename, file_content);
                 
-                if (requested_port == server_port) {
-                    saveFile(server_name, filename, file_content);
-                    
-                    char *msg = "File received successfully";
-                    send(dynamic_client, msg, strlen(msg), 0);
-                    printf("[SERVER %s] File %s saved\n", server_name, filename);
-                } else {
-                    char *msg = "REJECTED";
-                    send(dynamic_client, msg, strlen(msg), 0);
-                    printf("[SERVER] Request rejected - wrong port\n");
-                }
+                char *msg = "File received successfully";
+                send(dynamic_client, msg, strlen(msg), 0);
+                printf("[SERVER %s] File %s saved\n", alias, filename);
+            } else {
+                char *msg = "REJECTED";
+                send(dynamic_client, msg, strlen(msg), 0);
+                printf("[SERVER] Request rejected - invalid format\n");
             }
         }
         
