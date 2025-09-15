@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     char *filename = argv[3];
     struct sockaddr_in serv_addr;
     int dynamic_port;
-
+    struct addrinfo hints, *res;
     // Leer archivo
     FILE *fp = fopen(filename, "r");
     if (!fp) {
