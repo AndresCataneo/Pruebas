@@ -57,6 +57,11 @@ int main(int argc, char *argv[]) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
+    if (getaddrinfo(server_ip, NULL, &hints, &res) != 0) {
+        perror("Error resolving hostname");
+        exit(1);
+    }
+
     //Creamos el socket del cliente para la comunicación
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (client_sock < 0) {
