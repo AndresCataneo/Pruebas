@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
         if (bytes > 0) {
             response[bytes] = '\0';
             printf("SERVER RESPONSE: %s\n", response);
+            saveLog("SUCCESS", filename, server_ip);
         } else {
             printf("No response from server\n");
         }
