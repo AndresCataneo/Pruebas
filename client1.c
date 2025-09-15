@@ -7,17 +7,17 @@
 #include <time.h>
 
 #define BUFFER_SIZE 1024
-#define FILENAME_SIZE 256
-#define PORT_MSG_SIZE 64
-#define MAX_TOTAL_SIZE 2048
 
-void save_client_log(const char *status, const char *filename, const char *server) {
+/*
+    Función para guardar fecha, hora, estado, nombre de archivo y servidor
+*/
+void saveLog(const char *status, const char *filename, const char *server) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", t);
     
-    FILE *log_file = fopen("client_log.txt", "a");
+    FILE *log_file = fopen("clientLog.txt", "a");
     if (log_file) {
         fprintf(log_file, "%s | %s | %s | %s\n", timestamp, status, filename, server);
         fclose(log_file);
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     FILE *fp = fopen(filename, "r");
     if (!fp) {
         perror("Error opening file");
-        save_client_log("ERROR", filename, "File not found");
+        saveLog("ERROR", filename, "File not found");
         exit(1);
     }
 
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
     if (getaddrinfo(server_ip, NULL, &hints, &res) != 0) {
         perror("Error resolving hostname");
-        save_client_log("ERROR", filename, "Host resolution failed");
+        saveLog("ERROR", filename, "Host resolution failed");
         exit(1);
     }
 
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     int initial_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (initial_sock < 0) {
         perror("Socket creation failed");
-        save_client_log("ERROR", filename, "Socket creation failed");
+        saveLog("ERROR", filename, "Socket creation failed");
         freeaddrinfo(res);
         exit(1);
     }
@@ -81,14 +81,13 @@ int main(int argc, char *argv[]) {
 
     if (connect(initial_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("Connection failed");
-        save_client_log("ERROR", filename, "Connection failed");
+        saveLog("ERROR", filename, "Connection failed");
         close(initial_sock);
         exit(1);
     }
 
-    // [El resto del código igual...]
     // Recibir puerto dinámico
-    char port_response[PORT_MSG_SIZE] = {0};
+    char port_response[64] = {0};
     int bytes_received = recv(initial_sock, port_response, sizeof(port_response) - 1, 0);
     if (bytes_received <= 0) {
         perror("Error receiving port");
@@ -106,17 +105,17 @@ int main(int argc, char *argv[]) {
         
         if (connect(dynamic_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
             perror("Connection to dynamic port failed");
-            save_client_log("ERROR", filename, "Dynamic connection failed");
+            saveLog("ERROR", filename, "Dynamic connection failed");
             exit(1);
         }
 
         // [El resto del código igual...]
-        char buffer[MAX_TOTAL_SIZE];
+        char buffer[BUFFER_SIZE*2];
         snprintf(buffer, sizeof(buffer), "%d|%s|%s", port, filename, file_content);
 
         if (send(dynamic_sock, buffer, strlen(buffer), 0) < 0) {
             perror("Send failed");
-            save_client_log("ERROR", filename, "Send failed");
+            saveLog("ERROR", filename, "Send failed");
             close(dynamic_sock);
             exit(1);
         }
@@ -126,10 +125,10 @@ int main(int argc, char *argv[]) {
         if (bytes > 0) {
             response[bytes] = '\0';
             printf("SERVER RESPONSE: %s\n", response);
-            save_client_log("SUCCESS", filename, server_ip);
+            saveLog("SUCCESS", filename, server_ip);
         } else {
             printf("No response from server\n");
-            save_client_log("ERROR", filename, "No response");
+            saveLog("ERROR", filename, "No response");
         }
         
         close(dynamic_sock);
