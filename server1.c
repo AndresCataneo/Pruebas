@@ -13,16 +13,8 @@
 #define BUFFER_SIZE 1024
 #define server_port 49200  // Puerto base 
 
-/*
-    Función para obtener la fecha y hora actual 
-*/
-void getTimeDate(char *buffer, size_t size) {
-    time_t now = time(NULL);
-    struct tm *t = localtime(&now);
-    strftime(buffer, size, "%Y-%m-%d %H:%M:%S", t);
-}
 
-// Función para guardar archivo en el directorio del servidor
+// Función para guardar un archivo en el directorio del servidor
 void saveFile(const char *server_name, const char *filename, const char *content) {
     char file_path[256];
     char *home_dir = getenv("HOME");
