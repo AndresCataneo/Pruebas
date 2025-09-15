@@ -72,7 +72,8 @@ int main(int argc, char *argv[]) {
     // Configuramos la dirección del cliente
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    serv_addr.sin_addr.s_addr = inet_addr(server_ip);
+    struct sockaddr_in *ipv4 = (struct sockaddr_in *)res->ai_addr;
+    serv_addr.sin_addr = ipv4->sin_addr;
     
     freeaddrinfo(res);  
 
