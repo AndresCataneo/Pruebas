@@ -51,12 +51,6 @@ int main(int argc, char *argv[]) {
     file_content[bytes_read] = '\0';
     fclose(fp);
 
-    // RESOLVER NOMBRE DE SERVIDOR
-    struct addrinfo hints, *res;
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-
     if (getaddrinfo(server_ip, NULL, &hints, &res) != 0) {
         perror("Error resolving hostname");
         exit(1);
