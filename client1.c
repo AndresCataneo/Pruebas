@@ -31,9 +31,12 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    int client_sock;
     char *server_ip = argv[1];
     int port = atoi(argv[2]);
     char *filename = argv[3];
+    struct sockaddr_in serv_addr;
+    int dynamic_port;
 
     // Leer archivo
     FILE *fp = fopen(filename, "r");
@@ -54,68 +57,53 @@ int main(int argc, char *argv[]) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(server_ip, NULL, &hints, &res) != 0) {
-        perror("Error resolving hostname");
-        saveLog("ERROR", filename, "Host resolution failed");
-        exit(1);
-    }
-
-    // CONEXIÓN INICIAL al puerto estático
-    int initial_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (initial_sock < 0) {
+    //Creamos el socket del cliente para la comunicación
+    client_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_sock < 0) {
         perror("Socket creation failed");
-        saveLog("ERROR", filename, "Socket creation failed");
-        freeaddrinfo(res);
         exit(1);
     }
     
-    struct sockaddr_in serv_addr;
+    // Configuramos la dirección del cliente
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
+    serv_addr.sin_addr.s_addr = inet_addr(server_ip);
     
-    // Usar la dirección IP resuelta
-    struct sockaddr_in *ipv4 = (struct sockaddr_in *)res->ai_addr;
-    serv_addr.sin_addr = ipv4->sin_addr;
-    
-    freeaddrinfo(res);  // Liberar memoria
+    freeaddrinfo(res);  
 
-    if (connect(initial_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    //Nos conectamos al servidor
+    if (connect(client_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("Connection failed");
-        saveLog("ERROR", filename, "Connection failed");
-        close(initial_sock);
+        close(client_sock);
         exit(1);
     }
 
-    // Recibir puerto dinámico
+    // Recibimos el puerto dinámico
     char port_response[64] = {0};
-    int bytes_received = recv(initial_sock, port_response, sizeof(port_response) - 1, 0);
+    int bytes_received = recv(client_sock, port_response, sizeof(port_response) - 1, 0);
     if (bytes_received <= 0) {
         perror("Error receiving port");
-        close(initial_sock);
+        close(client_sock);
         exit(1);
     }
     port_response[bytes_received] = '\0';
-    close(initial_sock);
+    close(client_sock);
 
-    int dynamic_port;
+    // Nos conectamos al puerto dinámico recibido
     if (sscanf(port_response, "DYNAMIC_PORT|%d", &dynamic_port) == 1) {
-        // CONEXIÓN al puerto dinámico (usar la misma IP resuelta)
         int dynamic_sock = socket(AF_INET, SOCK_STREAM, 0);
         serv_addr.sin_port = htons(dynamic_port);
         
         if (connect(dynamic_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
             perror("Connection to dynamic port failed");
-            saveLog("ERROR", filename, "Dynamic connection failed");
             exit(1);
         }
 
-        // [El resto del código igual...]
         char buffer[BUFFER_SIZE*2];
         snprintf(buffer, sizeof(buffer), "%d|%s|%s", port, filename, file_content);
 
         if (send(dynamic_sock, buffer, strlen(buffer), 0) < 0) {
             perror("Send failed");
-            saveLog("ERROR", filename, "Send failed");
             close(dynamic_sock);
             exit(1);
         }
@@ -125,10 +113,8 @@ int main(int argc, char *argv[]) {
         if (bytes > 0) {
             response[bytes] = '\0';
             printf("SERVER RESPONSE: %s\n", response);
-            saveLog("SUCCESS", filename, server_ip);
         } else {
             printf("No response from server\n");
-            saveLog("ERROR", filename, "No response");
         }
         
         close(dynamic_sock);
