@@ -13,8 +13,8 @@
 #define BUFFER_SIZE 1024
 #define server_port 49200  // Puerto base 
 
-// Función para obtener timestamp
-void get_timestamp(char *buffer, size_t size) {
+// Función para obtener la fecha y hora actual 
+void getTimeDate(char *buffer, size_t size) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     strftime(buffer, size, "%Y-%m-%d %H:%M:%S", t);
