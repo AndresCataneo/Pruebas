@@ -7,14 +7,13 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
-#include <time.h>
 #include <sys/stat.h>
 
 #define BUFFER_SIZE 1024
 #define server_port 49200  // Puerto base 
 
 
-// Función para guardar un archivo en el directorio del servidor
+// Función para guardar archivo en el directorio del servidor
 void saveFile(const char *server_name, const char *filename, const char *content) {
     char file_path[256];
     char *home_dir = getenv("HOME");
@@ -80,7 +79,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("[*] LISTENING on base port %d...\n", server_port);
+    printf("[*] LISTENING on port %d...\n", server_port);
     printf("[*] Server started. Waiting for connections...\n");
 
     while (1) {
