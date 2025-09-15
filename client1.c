@@ -46,15 +46,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    char file_content[BUFFER_SIZE] = {0};
-    size_t bytes_read = fread(file_content, 1, sizeof(file_content) - 1, fp);
-    file_content[bytes_read] = '\0';
-    fclose(fp);
 
-    if (getaddrinfo(server_ip, NULL, &hints, &res) != 0) {
-        perror("Error resolving hostname");
-        exit(1);
-    }
 
     //Creamos el socket del cliente para la comunicación
     client_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -100,7 +92,7 @@ int main(int argc, char *argv[]) {
         }
 
         char buffer[BUFFER_SIZE*2];
-        snprintf(buffer, sizeof(buffer), "%s|%s|%s", server_ip, filename, file_content);
+        snprintf(buffer, sizeof(buffer), "%s|%s|%s", argv[1], filename, file_content);
 
         if (send(dynamic_sock, buffer, strlen(buffer), 0) < 0) {
             perror("Send failed");
