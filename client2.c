@@ -57,8 +57,8 @@ int main(int argc, char *argv[]) {
     file_content[bytes_read] = '\0';
     fclose(fp);
 
-    for (int i = 0; i < num_servers; i++) {
-        if (strcmp(origin, servers[i]) == 0){
+    for (int i = 0; i < 4; i++) {
+        if (strcmp(server_ip, servers[i]) == 0){
             continue;
         }
         //Obtenemos la dirección ip atraves del alias
