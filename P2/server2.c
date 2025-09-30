@@ -22,7 +22,6 @@ typedef struct {
     int receiving_server;
     bool server_busy;
     time_t turn_start_time;
-    bool first_cycle;  // Nueva variable para controlar el primer ciclo
     pthread_mutex_t mutex;
     pthread_cond_t turn_cond;
 } shared_memory_t;
@@ -150,7 +149,6 @@ void process_connection(int dynamic_client, int dynamic_sock, const char* target
 void* server_thread(void* arg) {
     int server_index = *(int*)arg;
     free(arg);
-    
     bool first_waiting_printed = false;
     
     while (1) {
@@ -158,8 +156,7 @@ void* server_thread(void* arg) {
         pthread_mutex_lock(&shared_mem->mutex);
         
         while (shared_mem->current_server != server_index || shared_mem->server_busy) {
-            // Solo imprimir "Waiting for turn" la primera vez o durante el primer ciclo
-            if (!first_waiting_printed || shared_mem->first_cycle) {
+            if (!first_waiting_printed) {
                 printf("[SERVER %s] Waiting for turn (current: %s)\n", 
                        server_names[server_index], server_names[shared_mem->current_server]);
                 first_waiting_printed = true;
@@ -175,39 +172,50 @@ void* server_thread(void* arg) {
         printf("\n[SERVER %s] Starting turn\n", server_names[server_index]);
         pthread_mutex_unlock(&shared_mem->mutex);
         
-        // PROCESAR ARCHIVOS DURANTE EL QUANTUM
+        // PROCESAR ARCHIVOS DURANTE EL QUANTUM COMPLETO
         time_t start_time = time(NULL);
         bool processed_any = false;
         int files_processed = 0;
         
-        while (1) {
+        while (!is_quantum_expired(start_time)) {
             connection_node_t* connection = get_next_connection(server_index);
             
             if (connection != NULL) {
                 processed_any = true;
                 files_processed++;
+                printf("[SERVER %s] Processing file...\n", server_names[server_index]);
                 process_connection(connection->dynamic_client, connection->dynamic_sock, server_names[server_index]);
                 free(connection);
                 
-                if (is_quantum_expired(start_time)) {
-                    printf("\n[SERVER %s] Quantum expired after processing %d files\n", 
-                           server_names[server_index], files_processed);
-                    break;
-                }
+                // ✅ NO salir después de procesar, seguir en el loop
+                // para procesar más archivos o esperar el tiempo restante
             } else {
+                // No hay archivos en la cola
                 if (processed_any) {
-                    printf("[SERVER %s] No more files in queue (%d files processed)\n", 
-                           server_names[server_index], files_processed);
+                    // Ya procesó algunos archivos, esperar tiempo restante
+                    time_t remaining = QUANTUM_TIME - (time(NULL) - start_time);
+                    if (remaining > 0) {
+                        printf("[SERVER %s] %d files processed, waiting %ld seconds...\n", 
+                               server_names[server_index], files_processed, remaining);
+                        sleep(remaining);
+                    }
                     break;
-                }
-                
-                sleep(1);
-                if (is_quantum_expired(start_time)) {
-                    printf("[SERVER %s] Quantum expired with no files to process\n", 
-                           server_names[server_index]);
-                    break;
+                } else {
+                    // No ha procesado nada aún, esperar un poco y verificar de nuevo
+                    sleep(1);
+                    // El loop continuará verificando hasta que expire el quantum
                 }
             }
+        }
+        
+        // Mensaje final del turno
+        time_t time_used = time(NULL) - start_time;
+        if (processed_any) {
+            printf("[SERVER %s] Quantum completed - %d files processed in %ld seconds\n", 
+                   server_names[server_index], files_processed, time_used);
+        } else {
+            printf("[SERVER %s] Quantum expired with no files to process\n", 
+                   server_names[server_index]);
         }
         
         // CEDER TURNO
@@ -216,11 +224,6 @@ void* server_thread(void* arg) {
         shared_mem->server_busy = false;
         shared_mem->receiving_server = -1;
         shared_mem->current_server = (shared_mem->current_server + 1) % 4;
-        
-        // Marcar que el primer ciclo ha terminado después de que todos hayan tenido su primer turno
-        if (shared_mem->current_server == 0) {
-            shared_mem->first_cycle = false;
-        }
         
         printf("[SERVER %s] Turn finished\n", server_names[server_index]);
         
@@ -262,16 +265,20 @@ void* connection_handler(void* arg) {
     return NULL;
 }
 
-// Hilo que maneja la expiración del quantum
+// Hilo que maneja la expiración del quantum (MODIFICADO)
 void* quantum_manager(void* arg) {
     while (1) {
-        sleep(1);
+        sleep(5);  // Verificar cada 5 segundos en lugar de 1
         
         pthread_mutex_lock(&shared_mem->mutex);
         
+        // ✅ SOLO cambiar turno si ningún servidor está recibiendo Y el quantum expiró
+        // Esto evita cambios automáticos durante el procesamiento
         if (!shared_mem->server_busy && is_quantum_expired(shared_mem->turn_start_time)) {
             shared_mem->current_server = (shared_mem->current_server + 1) % 4;
             shared_mem->turn_start_time = time(NULL);
+            
+            printf("[QUANTUM] Switching to server: %s\n", server_names[shared_mem->current_server]);
             
             pthread_cond_broadcast(&shared_mem->turn_cond);
         }
@@ -335,7 +342,6 @@ int main(int argc, char *argv[]) {
     shared_mem->receiving_server = -1;
     shared_mem->server_busy = false;
     shared_mem->turn_start_time = time(NULL);
-    shared_mem->first_cycle = true;  // ✅ FALTABA ESTA INICIALIZACIÓN
     pthread_mutex_init(&shared_mem->mutex, NULL);
     pthread_cond_init(&shared_mem->turn_cond, NULL);
 
