@@ -39,6 +39,10 @@ int main(int argc, char *argv[]) {
     int client_sock;
     char *server_ip = argv[1];
     int port = atoi(argv[2]);
+    char *filenames[argc - 3];
+    for (int i = 3; i < argc; i++) {
+        filenames[i - 3] = argv[i];
+    }
     struct sockaddr_in serv_addr;
     int dynamic_port;
     struct addrinfo name, *res;
@@ -96,9 +100,11 @@ int main(int argc, char *argv[]) {
             perror("Connection to dynamic port failed");
             exit(1);
         }
-        
-        for(int i = 3; i < argc; i++) {
-            char *filename = argv[i];
+
+        for(int i = 0; i < argc - 3; i++) {
+            // Enviamos el archivo
+            char *filename = filenames[i];
+            printf("Sending file: %s\n", filename);
             // Leer archivo
             FILE *fp = fopen(filename, "r");
             if (!fp) {
