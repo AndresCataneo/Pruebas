@@ -24,6 +24,7 @@ typedef struct {
     time_t turn_start_time;
     pthread_mutex_t mutex;
     pthread_cond_t turn_cond;
+    bool first_cycle;
 } shared_memory_t;
 
 // Estructura para cola de conexiones
@@ -149,14 +150,19 @@ void process_connection(int dynamic_client, int dynamic_sock, const char* target
 void* server_thread(void* arg) {
     int server_index = *(int*)arg;
     free(arg);
+    bool first_waiting_printed = false;
     
     while (1) {
         // ESPERAR TURNO
         pthread_mutex_lock(&shared_mem->mutex);
         
         while (shared_mem->current_server != server_index || shared_mem->server_busy) {
-            printf("[SERVER %s] Waiting for turn (current: %s)\n", 
-                   server_names[server_index], server_names[shared_mem->current_server]);
+            // Solo imprimir "Waiting for turn" la primera vez o durante el primer ciclo
+            if (!first_waiting_printed || shared_mem->first_cycle) {
+                printf("[SERVER %s] Waiting for turn (current: %s)\n", 
+                       server_names[server_index], server_names[shared_mem->current_server]);
+                first_waiting_printed = true;
+            }
             pthread_cond_wait(&shared_mem->turn_cond, &shared_mem->mutex);
         }
         
