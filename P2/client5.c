@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     
     if (getaddrinfo(server_ip, NULL, &name, &res) != 0) {
         perror("Error resolving hostname");
-        saveLog("ERROR", filename, "Host resolution failed");
+        saveLog("ERROR", filenames[0], "Host resolution failed");
         exit(1);
     }
 
