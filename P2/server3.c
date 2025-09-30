@@ -212,4 +212,101 @@ void* connection_handler(void* arg) {
 
     // leemos por adelantado (peek) para conocer el alias sin consumir el mensaje,
     // así el worker podrá recv() normalmente cuando procese la conexión.
-    char
+    char peek_buf[BUFFER_SIZE*2];
+    int bytes = recv(dynamic_client, peek_buf, sizeof(peek_buf)-1, MSG_PEEK);
+    if (bytes <= 0) { close(dynamic_client); close(dynamic_sock); return NULL; }
+    peek_buf[bytes] = '\0';
+
+    char alias[32], filename[256], content[BUFFER_SIZE];
+    if (sscanf(peek_buf, "%31[^|]|%255[^|]|%[^\n]", alias, filename, content) == 3) {
+        add_to_queue(alias, dynamic_client, dynamic_sock);
+    } else {
+        char *msg = "REJECTED - Invalid format";
+        send(dynamic_client, msg, strlen(msg), 0);
+        close(dynamic_client);
+        close(dynamic_sock);
+    }
+    return NULL;
+}
+
+// Quantum manager: si nadie está recibiendo y expiró quantum, avanza turno
+void* quantum_manager(void* arg) {
+    (void)arg;
+    while (1) {
+        sleep(1);
+        pthread_mutex_lock(&shared_mem->mutex);
+        if (!shared_mem->server_busy && is_quantum_expired(shared_mem->turn_start_time)) {
+            shared_mem->current_server = (shared_mem->current_server + 1) % 4;
+            shared_mem->turn_start_time = time(NULL);
+            printf("[QUANTUM] switching to %s\n", server_names[shared_mem->current_server]);
+            pthread_cond_broadcast(&shared_mem->turn_cond);
+        }
+        pthread_mutex_unlock(&shared_mem->mutex);
+    }
+    return NULL;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 5) { fprintf(stderr, "Usage: %s s01 s02 s03 s04\n", argv[0]); return 1; }
+    for (int i=0;i<4;i++) { server_names[i] = argv[i+1]; pthread_mutex_init(&queue_mutexes[i], NULL); }
+
+    // init shared mem
+    shared_mem = mmap(NULL, sizeof(shared_memory_t), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (shared_mem == MAP_FAILED) { perror("mmap"); return 1; }
+    shared_mem->current_server = 0;
+    shared_mem->receiving_server = -1;
+    shared_mem->server_busy = false;
+    shared_mem->turn_start_time = time(NULL);
+    pthread_mutex_init(&shared_mem->mutex, NULL);
+    pthread_cond_init(&shared_mem->turn_cond, NULL);
+
+    // lanzar workers por servidor
+    for (int i=0;i<4;i++){
+        int *idx = malloc(sizeof(int)); *idx = i;
+        pthread_t th; pthread_create(&th, NULL, server_thread, idx); pthread_detach(th);
+    }
+
+    pthread_t qm; pthread_create(&qm, NULL, quantum_manager, NULL); pthread_detach(qm);
+
+    // socket principal (puerto base)
+    int port_s = socket(AF_INET, SOCK_STREAM, 0);
+    if (port_s < 0) { perror("socket"); return 1; }
+    int opt = 1; setsockopt(port_s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET; addr.sin_port = htons(SERVER_PORT); addr.sin_addr.s_addr = INADDR_ANY;
+    if (bind(port_s, (struct sockaddr*)&addr, sizeof(addr)) < 0) { perror("bind"); close(port_s); return 1; }
+    if (listen(port_s, 10) < 0) { perror("listen"); close(port_s); return 1; }
+
+    printf("[*] Round Robin initialized (quantum %ds)\n", QUANTUM_TIME);
+    printf("[*] Turn order: %s -> %s -> %s -> %s\n", server_names[0], server_names[1], server_names[2], server_names[3]);
+    printf("[*] LISTENING on port %d...\n\n", SERVER_PORT);
+
+    int port_counter = 1;
+    while (1) {
+        struct sockaddr_in client_addr; socklen_t alen = sizeof(client_addr);
+        int client_fd = accept(port_s, (struct sockaddr*)&client_addr, &alen);
+        if (client_fd < 0) continue;
+
+        int dynamic_port = SERVER_PORT + port_counter++;
+        char port_msg[64]; snprintf(port_msg, sizeof(port_msg), "DYNAMIC_PORT|%d", dynamic_port);
+        send(client_fd, port_msg, strlen(port_msg), 0);
+        close(client_fd);
+
+        int dyn_sock = socket(AF_INET, SOCK_STREAM, 0);
+        setsockopt(dyn_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        struct sockaddr_in dyn = {0}; dyn.sin_family = AF_INET; dyn.sin_port = htons(dynamic_port); dyn.sin_addr.s_addr = INADDR_ANY;
+        if (bind(dyn_sock, (struct sockaddr*)&dyn, sizeof(dyn)) < 0) { perror("bind dyn"); close(dyn_sock); continue; }
+        if (listen(dyn_sock, 1) < 0) { perror("listen dyn"); close(dyn_sock); continue; }
+
+        int dyn_client = accept(dyn_sock, NULL, NULL);
+        if (dyn_client < 0) { close(dyn_sock); continue; }
+
+        printf("[*] Client connected on dynamic port %d (fd=%d)\n", dynamic_port, dyn_client);
+
+        int *s = malloc(2*sizeof(int)); s[0]=dyn_client; s[1]=dyn_sock;
+        pthread_t h; pthread_create(&h, NULL, connection_handler, s); pthread_detach(h);
+    }
+
+    close(port_s);
+    return 0;
+}
