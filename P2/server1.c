@@ -22,9 +22,9 @@ typedef struct {
     int receiving_server;
     bool server_busy;
     time_t turn_start_time;
-    bool first_cycle;  // Nueva variable para controlar el primer ciclo
     pthread_mutex_t mutex;
     pthread_cond_t turn_cond;
+    bool first_cycle;
 } shared_memory_t;
 
 // Estructura para cola de conexiones
@@ -150,7 +150,6 @@ void process_connection(int dynamic_client, int dynamic_sock, const char* target
 void* server_thread(void* arg) {
     int server_index = *(int*)arg;
     free(arg);
-    
     bool first_waiting_printed = false;
     
     while (1) {
@@ -190,7 +189,7 @@ void* server_thread(void* arg) {
                 free(connection);
                 
                 if (is_quantum_expired(start_time)) {
-                    printf("\n[SERVER %s] Quantum expired after processing %d files\n", 
+                    printf("[SERVER %s] Quantum expired after processing %d files\n", 
                            server_names[server_index], files_processed);
                     break;
                 }
@@ -216,11 +215,6 @@ void* server_thread(void* arg) {
         shared_mem->server_busy = false;
         shared_mem->receiving_server = -1;
         shared_mem->current_server = (shared_mem->current_server + 1) % 4;
-        
-        // Marcar que el primer ciclo ha terminado después de que todos hayan tenido su primer turno
-        if (shared_mem->current_server == 0) {
-            shared_mem->first_cycle = false;
-        }
         
         printf("[SERVER %s] Turn finished\n", server_names[server_index]);
         
@@ -272,6 +266,8 @@ void* quantum_manager(void* arg) {
         if (!shared_mem->server_busy && is_quantum_expired(shared_mem->turn_start_time)) {
             shared_mem->current_server = (shared_mem->current_server + 1) % 4;
             shared_mem->turn_start_time = time(NULL);
+            
+            printf("[QUANTUM] Switching to server: %s\n", server_names[shared_mem->current_server]);
             
             pthread_cond_broadcast(&shared_mem->turn_cond);
         }
@@ -334,7 +330,6 @@ int main(int argc, char *argv[]) {
     shared_mem->current_server = 0;
     shared_mem->receiving_server = -1;
     shared_mem->server_busy = false;
-    shared_mem->first_cycle = true;  // Iniciar en primer ciclo
     shared_mem->turn_start_time = time(NULL);
     pthread_mutex_init(&shared_mem->mutex, NULL);
     pthread_cond_init(&shared_mem->turn_cond, NULL);
