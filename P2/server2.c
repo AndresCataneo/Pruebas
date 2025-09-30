@@ -242,6 +242,7 @@ void* serverThread(void* arg) {
         
         pthread_cond_broadcast(&shared_mem->turn_cond);
         pthread_mutex_unlock(&shared_mem->mutex);
+        usleep(1000); 
     }
     
     return NULL;
@@ -301,6 +302,7 @@ void* quantumAdmin(void* arg) {
         }
         
         pthread_mutex_unlock(&shared_mem->mutex);
+        usleep(1000); 
     }
     return NULL;
 }
@@ -449,6 +451,7 @@ int main(int argc, char *argv[]) {
         pthread_t handler_thread;
         pthread_create(&handler_thread, NULL, connectionHand, sockets);
         pthread_detach(handler_thread);
+        usleep(1000); 
     }
     
     close(port_s);
