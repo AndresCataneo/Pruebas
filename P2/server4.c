@@ -85,17 +85,25 @@ void add_to_queue(const char* target_server, int dynamic_client, int dynamic_soc
     
     pthread_mutex_lock(&queue_mutexes[server_index]);
     
+    // Contar archivos en cola actualmente
+    int queue_count = 0;
+    connection_node_t* current = connection_queues[server_index];
+    while (current != NULL) {
+        queue_count++;
+        current = current->next;
+    }
+    
     if (connection_queues[server_index] == NULL) {
         connection_queues[server_index] = new_node;
     } else {
-        connection_node_t* current = connection_queues[server_index];
+        current = connection_queues[server_index];
         while (current->next != NULL) {
             current = current->next;
         }
         current->next = new_node;
     }
     
-    printf("[QUEUE] Added to %s queue\n", target_server);
+    printf("[QUEUE] ✅ Added to %s queue (%d files total)\n", target_server, queue_count + 1);
     pthread_mutex_unlock(&queue_mutexes[server_index]);
 }
 
@@ -243,7 +251,7 @@ void* connection_handler(void* arg) {
     
     char buffer[BUFFER_SIZE] = {0};
     
-    // Leer los datos COMPLETAMENTE
+    // ✅ CORREGIDO: Leer los datos COMPLETAMENTE, no solo PEEK
     int bytes = recv(dynamic_client, buffer, sizeof(buffer) - 1, 0);
     if (bytes > 0) {
         buffer[bytes] = '\0';
@@ -253,49 +261,17 @@ void* connection_handler(void* arg) {
         char content[BUFFER_SIZE];
         
         if (sscanf(buffer, "%31[^|]|%255[^|]|%[^\n]", alias, filename, content) == 3) {
-            printf("[HANDLER] File '%s' received for server: %s\n", filename, alias);
+            printf("[HANDLER] 📨 File '%s' received for server: %s\n", filename, alias);
             
-            // Encontrar el índice del servidor target
-            int target_index = -1;
-            for (int i = 0; i < 4; i++) {
-                if (strcmp(alias, server_names[i]) == 0) {
-                    target_index = i;
-                    break;
-                }
-            }
-            
-            if (target_index == -1) {
-                printf("[HANDLER] Error: Unknown server alias %s\n", alias);
-                close(dynamic_client);
-                close(dynamic_sock);
-                return NULL;
-            }
-            
-            // Verificar si este servidor está actualmente activo
-            pthread_mutex_lock(&shared_mem->mutex);
-            bool is_target_active = (shared_mem->current_server == target_index);
-            bool is_busy = shared_mem->server_busy;
-            pthread_mutex_unlock(&shared_mem->mutex);
-            
-            printf("[HANDLER] Current active: %s, Target: %s, Active: %d, Busy: %d\n", 
-                   server_names[shared_mem->current_server], alias, is_target_active, is_busy);
-            
-            if (is_target_active && !is_busy) {
-                // ✅ SERVIDOR TARGET ESTÁ ACTIVO - PROCESAR INMEDIATAMENTE
-                printf("[HANDLER] Target server %s is ACTIVE - processing immediately\n", alias);
-                process_connection(dynamic_client, dynamic_sock, alias);
-            } else {
-                // ❌ SERVIDOR TARGET NO ESTÁ ACTIVO - ENCOLAR
-                printf("[HANDLER] Target server %s not active - adding to queue\n", alias);
-                add_to_queue(alias, dynamic_client, dynamic_sock);
-            }
+            // ✅ SIEMPRE encolar - NUNCA procesar inmediatamente
+            add_to_queue(alias, dynamic_client, dynamic_sock);
         } else {
-            printf("[HANDLER] Invalid message format\n");
+            printf("[HANDLER] ❌ Invalid message format\n");
             close(dynamic_client);
             close(dynamic_sock);
         }
     } else {
-        printf("[HANDLER] No data received\n");
+        printf("[HANDLER] ❌ No data received\n");
         close(dynamic_client);
         close(dynamic_sock);
     }
