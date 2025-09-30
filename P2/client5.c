@@ -97,7 +97,8 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
         
-        for(int f = 3; f < argc; f++) {
+        for(int i = 3; i < argc; i++) {
+            char *filename = argv[i];
             // Leer archivo
             FILE *fp = fopen(filename, "r");
             if (!fp) {
