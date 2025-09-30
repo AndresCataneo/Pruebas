@@ -203,7 +203,7 @@ void* serverThread(void* arg) {
         
         //Procesamos conexiones hasta que expire el quantum. Nos aseguramos que cada servidor tenga su turno y no se quede esperando indefinidamente.
         while (!quantumExpired(start_time)) {
-            connection_node_t* connection = getNext(server_index);
+            connection_node_t* connection = getNextConnection(server_index);
             //Nos aseguramos que el servidor procese las conexiones en su cola, si se le acaba el tiempo y aun hay conexiones, debe esperar su siguiente turno
             // Si el tiempo se acaba mientras procesa una conexión, la termina y cede el turno
             if (connection != NULL) {
@@ -295,7 +295,7 @@ void* quantumAdmin(void* arg) {
             shared_mem->current_server = (shared_mem->current_server + 1) % 4;
             shared_mem->turn_start_time = time(NULL);
 
-            printf("[Server %s] Switching to server: %s\n", server_names[shared_mem->current_server]);
+            printf("[*] Switching to server: %s\n", server_names[shared_mem->current_server]);
 
             pthread_cond_broadcast(&shared_mem->turn_cond);
         }
@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
         }
         
         printf("[*] Assigned dynamic port %d to client\n", dynamic_port);
-        
+
         // Aceptamos la conexión del cliente en el puerto dinámico
         int dynamic_client = accept(dynamic_sock, NULL, NULL);
         if (dynamic_client < 0) {
