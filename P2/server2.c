@@ -183,7 +183,6 @@ void* server_thread(void* arg) {
             if (connection != NULL) {
                 processed_any = true;
                 files_processed++;
-                printf("[SERVER %s] Processing file...\n", server_names[server_index]);
                 process_connection(connection->dynamic_client, connection->dynamic_sock, server_names[server_index]);
                 free(connection);
                 
@@ -195,8 +194,6 @@ void* server_thread(void* arg) {
                     // Ya procesó algunos archivos, esperar tiempo restante
                     time_t remaining = QUANTUM_TIME - (time(NULL) - start_time);
                     if (remaining > 0) {
-                        printf("[SERVER %s] %d files processed, waiting %ld seconds...\n", 
-                               server_names[server_index], files_processed, remaining);
                         sleep(remaining);
                     }
                     break;
@@ -211,7 +208,6 @@ void* server_thread(void* arg) {
         // Mensaje final del turno
         time_t time_used = time(NULL) - start_time;
         if (processed_any) {
-            printf("[SERVER %s] Quantum completed - %d files processed in %ld seconds\n", 
                    server_names[server_index], files_processed, time_used);
         } else {
             printf("[SERVER %s] Quantum expired with no files to process\n", 
