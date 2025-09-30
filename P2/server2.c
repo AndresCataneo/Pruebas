@@ -208,7 +208,6 @@ void* server_thread(void* arg) {
         // Mensaje final del turno
         time_t time_used = time(NULL) - start_time;
         if (processed_any) {
-                   server_names[server_index], files_processed, time_used);
         } else {
             printf("[SERVER %s] Quantum expired with no files to process\n", 
                    server_names[server_index]);
