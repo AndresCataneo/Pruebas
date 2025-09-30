@@ -290,31 +290,6 @@ int main(int argc, char *argv[]) {
         pthread_mutex_init(&queue_mutexes[i], NULL);
     }
 
-    shared_mem = mmap(NULL, sizeof(shared_memory_t), PROT_READ | PROT_WRITE, 
-                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    shared_mem->current_server = 0;
-    shared_mem->receiving_server = -1;
-    shared_mem->server_busy = false;
-    shared_mem->turn_start_time = time(NULL);
-    pthread_mutex_init(&shared_mem->mutex, NULL);
-    pthread_cond_init(&shared_mem->turn_cond, NULL);
-    
-    printf("[*] Round Robin initialized (quantum: %ds)\n", QUANTUM_TIME);
-    printf("[*] Turn order: %s -> %s -> %s -> %s\n", 
-           server_names[0], server_names[1], server_names[2], server_names[3]);
-
-    pthread_t server_threads[4];
-    for (int i = 0; i < 4; i++) {
-        int* server_index = malloc(sizeof(int));
-        *server_index = i;
-        pthread_create(&server_threads[i], NULL, server_thread, server_index);
-        pthread_detach(server_threads[i]);
-    }
-
-    pthread_t quantum_thread;
-    pthread_create(&quantum_thread, NULL, quantum_manager, NULL);
-    pthread_detach(quantum_thread);
-
     port_s = socket(AF_INET, SOCK_STREAM, 0);
     if (port_s < 0) {
         perror("[-] Error creating socket");
@@ -339,8 +314,31 @@ int main(int argc, char *argv[]) {
         close(port_s);
         return 1;
     }
-
+    
+    printf("[*] Round Robin initialized (quantum: %ds)\n", QUANTUM_TIME);
+    printf("[*] Turn order: %s -> %s -> %s -> %s\n", server_names[0], server_names[1], server_names[2], server_names[3]);
     printf("[*] LISTENING on port %d...\n\n", server_port);
+
+    shared_mem = mmap(NULL, sizeof(shared_memory_t), PROT_READ | PROT_WRITE, 
+                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    shared_mem->current_server = 0;
+    shared_mem->receiving_server = -1;
+    shared_mem->server_busy = false;
+    shared_mem->turn_start_time = time(NULL);
+    pthread_mutex_init(&shared_mem->mutex, NULL);
+    pthread_cond_init(&shared_mem->turn_cond, NULL);
+
+    pthread_t server_threads[4];
+    for (int i = 0; i < 4; i++) {
+        int* server_index = malloc(sizeof(int));
+        *server_index = i;
+        pthread_create(&server_threads[i], NULL, server_thread, server_index);
+        pthread_detach(server_threads[i]);
+    }
+
+    pthread_t quantum_thread;
+    pthread_create(&quantum_thread, NULL, quantum_manager, NULL);
+    pthread_detach(quantum_thread);
 
     while (1) {
         struct sockaddr_in client_addr;
