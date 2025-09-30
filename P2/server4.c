@@ -78,32 +78,22 @@ void add_to_queue(const char* target_server, int dynamic_client, int dynamic_soc
     }
     
     if (server_index == -1) {
-        printf("[QUEUE] Error: Unknown server %s\n", target_server);
         free(new_node);
         return;
     }
     
     pthread_mutex_lock(&queue_mutexes[server_index]);
     
-    // Contar archivos en cola actualmente
-    int queue_count = 0;
-    connection_node_t* current = connection_queues[server_index];
-    while (current != NULL) {
-        queue_count++;
-        current = current->next;
-    }
-    
     if (connection_queues[server_index] == NULL) {
         connection_queues[server_index] = new_node;
     } else {
-        current = connection_queues[server_index];
+        connection_node_t* current = connection_queues[server_index];
         while (current->next != NULL) {
             current = current->next;
         }
         current->next = new_node;
     }
     
-    printf("[QUEUE] ✅ Added to %s queue (%d files total)\n", target_server, queue_count + 1);
     pthread_mutex_unlock(&queue_mutexes[server_index]);
 }
 
@@ -193,23 +183,24 @@ void* server_thread(void* arg) {
             if (connection != NULL) {
                 processed_any = true;
                 files_processed++;
-                printf("[SERVER %s] Processing file from queue\n", server_names[server_index]);
                 process_connection(connection->dynamic_client, connection->dynamic_sock, server_names[server_index]);
                 free(connection);
+                
+                // ✅ NO salir después de procesar, seguir en el loop
+                // para procesar más archivos o esperar el tiempo restante
             } else {
                 // No hay archivos en la cola
                 if (processed_any) {
                     // Ya procesó algunos archivos, esperar tiempo restante
                     time_t remaining = QUANTUM_TIME - (time(NULL) - start_time);
                     if (remaining > 0) {
-                        printf("[SERVER %s] %d files processed, waiting %ld seconds...\n", 
-                               server_names[server_index], files_processed, remaining);
                         sleep(remaining);
                     }
                     break;
                 } else {
                     // No ha procesado nada aún, esperar un poco y verificar de nuevo
                     sleep(1);
+                    // El loop continuará verificando hasta que expire el quantum
                 }
             }
         }
@@ -217,7 +208,6 @@ void* server_thread(void* arg) {
         // Mensaje final del turno
         time_t time_used = time(NULL) - start_time;
         if (processed_any) {
-            printf("[SERVER %s] Quantum completed - %d files processed in %ld seconds\n", 
                    server_names[server_index], files_processed, time_used);
         } else {
             printf("[SERVER %s] Quantum expired with no files to process\n", 
@@ -235,14 +225,12 @@ void* server_thread(void* arg) {
         
         pthread_cond_broadcast(&shared_mem->turn_cond);
         pthread_mutex_unlock(&shared_mem->mutex);
-        
-        first_waiting_printed = false;
     }
     
     return NULL;
 }
 
-// Hilo para leer el archivo y determinar el servidor target - CORREGIDO
+// Hilo para leer el archivo y determinar el servidor target
 void* connection_handler(void* arg) {
     int* sockets = (int*)arg;
     int dynamic_client = sockets[0];
@@ -251,7 +239,7 @@ void* connection_handler(void* arg) {
     
     char buffer[BUFFER_SIZE] = {0};
     
-    // ✅ CORREGIDO: Leer los datos COMPLETAMENTE, no solo PEEK
+    // ✅ LEE REALMENTE los datos, no solo MSG_PEEK
     int bytes = recv(dynamic_client, buffer, sizeof(buffer) - 1, 0);
     if (bytes > 0) {
         buffer[bytes] = '\0';
@@ -261,17 +249,18 @@ void* connection_handler(void* arg) {
         char content[BUFFER_SIZE];
         
         if (sscanf(buffer, "%31[^|]|%255[^|]|%[^\n]", alias, filename, content) == 3) {
-            printf("[HANDLER] 📨 File '%s' received for server: %s\n", filename, alias);
-            
-            // ✅ SIEMPRE encolar - NUNCA procesar inmediatamente
+            // ✅ ENCOLA LA CONEXIÓN (el cliente sigue esperando respuesta)
             add_to_queue(alias, dynamic_client, dynamic_sock);
+            
+            // ✅ NO cierres la conexión aquí - el serv_thread la cerrará después de procesar
+            printf("[HANDLER] * File '%s' received for server: %s\n", filename, alias);
         } else {
-            printf("[HANDLER] ❌ Invalid message format\n");
+            char *msg = "REJECTED - Invalid format";
+            send(dynamic_client, msg, strlen(msg), 0);
             close(dynamic_client);
             close(dynamic_sock);
         }
     } else {
-        printf("[HANDLER] ❌ No data received\n");
         close(dynamic_client);
         close(dynamic_sock);
     }
@@ -279,13 +268,15 @@ void* connection_handler(void* arg) {
     return NULL;
 }
 
-// Hilo que maneja la expiración del quantum
+// Hilo que maneja la expiración del quantum (MODIFICADO)
 void* quantum_manager(void* arg) {
     while (1) {
-        sleep(5);
+        sleep(5);  // Verificar cada 5 segundos en lugar de 1
         
         pthread_mutex_lock(&shared_mem->mutex);
         
+        // ✅ SOLO cambiar turno si ningún servidor está recibiendo Y el quantum expiró
+        // Esto evita cambios automáticos durante el procesamiento
         if (!shared_mem->server_busy && is_quantum_expired(shared_mem->turn_start_time)) {
             shared_mem->current_server = (shared_mem->current_server + 1) % 4;
             shared_mem->turn_start_time = time(NULL);
