@@ -334,8 +334,8 @@ int main(int argc, char *argv[]) {
     shared_mem->current_server = 0;
     shared_mem->receiving_server = -1;
     shared_mem->server_busy = false;
-    shared_mem->first_cycle = true;  // Iniciar en primer ciclo
     shared_mem->turn_start_time = time(NULL);
+    shared_mem->first_cycle = true;  // ✅ FALTABA ESTA INICIALIZACIÓN
     pthread_mutex_init(&shared_mem->mutex, NULL);
     pthread_cond_init(&shared_mem->turn_cond, NULL);
 
