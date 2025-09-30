@@ -30,7 +30,7 @@ typedef struct {
 typedef struct connection_node {
     int dynamic_client;
     int dynamic_sock;
-    char target_server[32];  // Servidor al que va dirigido el archivo
+    char target_server[32];
     struct connection_node* next;
 } connection_node_t;
 
@@ -69,7 +69,6 @@ void add_to_queue(const char* target_server, int dynamic_client, int dynamic_soc
     new_node->target_server[sizeof(new_node->target_server) - 1] = '\0';
     new_node->next = NULL;
     
-    // Encontrar el índice del servidor target
     int server_index = -1;
     for (int i = 0; i < 4; i++) {
         if (strcmp(target_server, server_names[i]) == 0) {
@@ -79,7 +78,6 @@ void add_to_queue(const char* target_server, int dynamic_client, int dynamic_soc
     }
     
     if (server_index == -1) {
-        printf("[QUEUE] Error: Unknown server %s\n", target_server);
         free(new_node);
         return;
     }
@@ -96,7 +94,6 @@ void add_to_queue(const char* target_server, int dynamic_client, int dynamic_soc
         current->next = new_node;
     }
     
-    printf("[QUEUE] Added connection to %s queue\n", target_server);
     pthread_mutex_unlock(&queue_mutexes[server_index]);
 }
 
@@ -132,7 +129,7 @@ void process_connection(int dynamic_client, int dynamic_sock, const char* target
                 saveFile(alias, filename, file_content);
                 char *msg = "File received successfully";
                 send(dynamic_client, msg, strlen(msg), 0);
-                printf("[SERVER %s] File %s saved COMPLETELY\n", alias, filename);
+                printf("[SERVER %s] File %s received\n", alias, filename);
             } else {
                 char *msg = "REJECTED - Wrong server";
                 send(dynamic_client, msg, strlen(msg), 0);
@@ -141,7 +138,6 @@ void process_connection(int dynamic_client, int dynamic_sock, const char* target
         } else {
             char *msg = "REJECTED";
             send(dynamic_client, msg, strlen(msg), 0);
-            printf("[SERVER %s] Request rejected - invalid format\n", target_server);
         }
     }
     
@@ -154,71 +150,67 @@ void* server_thread(void* arg) {
     int server_index = *(int*)arg;
     free(arg);
     
-    printf("[THREAD %s] Server thread started\n", server_names[server_index]);
-    
     while (1) {
-        // === ESPERAR TURNO ===
+        // ESPERAR TURNO
         pthread_mutex_lock(&shared_mem->mutex);
         
         while (shared_mem->current_server != server_index || shared_mem->server_busy) {
-            printf("[SERVER %s] Waiting for turn (current: %s, busy: %d)\n", 
-                   server_names[server_index], server_names[shared_mem->current_server], 
-                   shared_mem->server_busy);
+            printf("[SERVER %s] Waiting for turn (current: %s)\n", 
+                   server_names[server_index], server_names[shared_mem->current_server]);
             pthread_cond_wait(&shared_mem->turn_cond, &shared_mem->mutex);
         }
         
-        // === INICIAR TURNO ===
+        // INICIAR TURNO
         shared_mem->server_busy = true;
         shared_mem->receiving_server = server_index;
         shared_mem->turn_start_time = time(NULL);
         
-        printf("[SERVER %s] Starting turn for %d seconds\n", server_names[server_index], QUANTUM_TIME);
+        printf("\n[SERVER %s] Starting turn\n", server_names[server_index]);
         pthread_mutex_unlock(&shared_mem->mutex);
         
-        // === PROCESAR ARCHIVOS DURANTE EL QUANTUM ===
+        // PROCESAR ARCHIVOS DURANTE EL QUANTUM
         time_t start_time = time(NULL);
         bool processed_any = false;
+        int files_processed = 0;
         
         while (1) {
-            // Verificar si hay conexiones en cola para ESTE servidor
             connection_node_t* connection = get_next_connection(server_index);
             
             if (connection != NULL) {
                 processed_any = true;
-                printf("[SERVER %s] Processing file...\n", server_names[server_index]);
+                files_processed++;
                 process_connection(connection->dynamic_client, connection->dynamic_sock, server_names[server_index]);
                 free(connection);
                 
-                // Verificar si se acabó el tiempo
                 if (is_quantum_expired(start_time)) {
-                    printf("[SERVER %s] Quantum expired after processing file\n", server_names[server_index]);
+                    printf("[SERVER %s] Quantum expired after processing %d files\n", 
+                           server_names[server_index], files_processed);
                     break;
                 }
             } else {
-                // No hay archivos en espera
                 if (processed_any) {
-                    printf("[SERVER %s] No more files in queue\n", server_names[server_index]);
+                    printf("[SERVER %s] No more files in queue (%d files processed)\n", 
+                           server_names[server_index], files_processed);
                     break;
                 }
                 
-                // Esperar un poco si no ha procesado nada aún
                 sleep(1);
                 if (is_quantum_expired(start_time)) {
-                    printf("[SERVER %s] Quantum expired with no files to process\n", server_names[server_index]);
+                    printf("[SERVER %s] Quantum expired with no files to process\n", 
+                           server_names[server_index]);
                     break;
                 }
             }
         }
         
-        // === CEDER TURNO ===
+        // CEDER TURNO
         pthread_mutex_lock(&shared_mem->mutex);
         
         shared_mem->server_busy = false;
         shared_mem->receiving_server = -1;
         shared_mem->current_server = (shared_mem->current_server + 1) % 4;
         
-        printf("[SERVER %s] Turn finished, next server: %s\n", 
-               server_names[server_index], server_names[shared_mem->current_server]);
+        printf("[SERVER %s] Turn finished\n", server_names[server_index]);
         
         pthread_cond_broadcast(&shared_mem->turn_cond);
         pthread_mutex_unlock(&shared_mem->mutex);
@@ -236,7 +228,6 @@ void* connection_handler(void* arg) {
     
     char buffer[BUFFER_SIZE] = {0};
     
-    // Leer solo el alias para determinar el servidor target
     int bytes = recv(dynamic_client, buffer, sizeof(buffer) - 1, MSG_PEEK);
     if (bytes > 0) {
         buffer[bytes] = '\0';
@@ -246,10 +237,8 @@ void* connection_handler(void* arg) {
         char content[BUFFER_SIZE];
         
         if (sscanf(buffer, "%31[^|]|%255[^|]|%[^\n]", alias, filename, content) == 3) {
-            printf("[HANDLER] File is for server: %s\n", alias);
             add_to_queue(alias, dynamic_client, dynamic_sock);
         } else {
-            printf("[HANDLER] Invalid format, closing connection\n");
             close(dynamic_client);
             close(dynamic_sock);
         }
@@ -268,13 +257,11 @@ void* quantum_manager(void* arg) {
         
         pthread_mutex_lock(&shared_mem->mutex);
         
-        // Cambiar turno solo si ningún servidor está recibiendo y el quantum expiró
         if (!shared_mem->server_busy && is_quantum_expired(shared_mem->turn_start_time)) {
             shared_mem->current_server = (shared_mem->current_server + 1) % 4;
             shared_mem->turn_start_time = time(NULL);
             
-            printf("[QUANTUM MANAGER] Switching to server: %s\n", 
-                   server_names[shared_mem->current_server]);
+            printf("[QUANTUM] Switching to server: %s\n", server_names[shared_mem->current_server]);
             
             pthread_cond_broadcast(&shared_mem->turn_cond);
         }
@@ -285,7 +272,7 @@ void* quantum_manager(void* arg) {
 }
 
 /*
-    Función principal - MANTIENE LA ESTRUCTURA ORIGINAL
+    Función principal
 */
 int main(int argc, char *argv[]) {
     int port_s;
@@ -298,13 +285,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Guardar nombres de servidores
     for (int i = 0; i < 4; i++) {
         server_names[i] = argv[i + 1];
         pthread_mutex_init(&queue_mutexes[i], NULL);
     }
 
-    // Memoria compartida
     shared_mem = mmap(NULL, sizeof(shared_memory_t), PROT_READ | PROT_WRITE, 
                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     shared_mem->current_server = 0;
@@ -318,7 +303,6 @@ int main(int argc, char *argv[]) {
     printf("[*] Turn order: %s -> %s -> %s -> %s\n", 
            server_names[0], server_names[1], server_names[2], server_names[3]);
 
-    // Hilos servidores
     pthread_t server_threads[4];
     for (int i = 0; i < 4; i++) {
         int* server_index = malloc(sizeof(int));
@@ -327,12 +311,10 @@ int main(int argc, char *argv[]) {
         pthread_detach(server_threads[i]);
     }
 
-    // Quantum manager
     pthread_t quantum_thread;
     pthread_create(&quantum_thread, NULL, quantum_manager, NULL);
     pthread_detach(quantum_thread);
 
-    // === ESTRUCTURA ORIGINAL DEL MAIN ===
     port_s = socket(AF_INET, SOCK_STREAM, 0);
     if (port_s < 0) {
         perror("[-] Error creating socket");
@@ -358,27 +340,21 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("[*] LISTENING on port %d...\n", server_port);
-    printf("[*] Server started. Waiting for connections...\n");
+    printf("[*] LISTENING on port %d...\n\n", server_port);
 
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t addr_size = sizeof(client_addr);
         client_port = accept(port_s, (struct sockaddr*)&client_addr, &addr_size);
         
-        if (client_port < 0) {
-            perror("Accept error");
-            continue;
-        }
+        if (client_port < 0) continue;
 
-        // Asignar puerto dinámico
         int dynamic_port = server_port + port_counter++;
         char port_msg[64];
         snprintf(port_msg, sizeof(port_msg), "DYNAMIC_PORT|%d", dynamic_port);
         send(client_port, port_msg, strlen(port_msg), 0);
         close(client_port);
 
-        // Socket dinámico
         int dynamic_sock = socket(AF_INET, SOCK_STREAM, 0);
         struct sockaddr_in dynamic_addr;
         dynamic_addr.sin_family = AF_INET;
@@ -395,9 +371,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
         
-        printf("[*] Assigned dynamic port %d to client\n", dynamic_port);
+        printf("[*] Client connected (port %d)\n", dynamic_port);
 
-        // Crear hilo para determinar el servidor target y agregar a cola
         int* sockets = malloc(2 * sizeof(int));
         sockets[0] = dynamic_client;
         sockets[1] = dynamic_sock;
