@@ -37,8 +37,8 @@ int main(int argc, char *argv[]) {
     }
 
     int client_sock;
-    int port = atoi(argv[2]);
-    char *filename = argv[3];
+    int port = atoi(argv[1]);
+    char *filename = argv[2];
     struct sockaddr_in serv_addr;
     int dynamic_port;
     struct addrinfo name, *res;
