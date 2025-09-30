@@ -30,7 +30,7 @@ void saveLog(const char *status, const char *filename, const char *server) {
     Función principal para conectar al servidor, recibir un puerto dinámico, conectarse a él y enviar o recibir datos
 */
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
+    if (argc != 5) {
         printf("USE: %s <SERVER> <PORT> <NUM_TIMES> <FILE>\n", argv[0]);
         printf("Example: %s s01 49200 3 file1.txt\n", argv[0]);
         exit(1);
